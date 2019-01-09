@@ -8,7 +8,7 @@ void init_sdlaudio();
 // with the condition as soon as possible.
 extern volatile unsigned int AudioFastForwarded;
 
-#define AUDIO_OUTPUT_BUFFER_SIZE 1476
+#define AUDIO_OUTPUT_BUFFER_SIZE 2048
 
 // OUTPUT_SOUND_FREQUENCY should be a power-of-2 fraction of SOUND_FREQUENCY;
 // if not, gcwsound.c's feed_buffer() needs to resample the output.

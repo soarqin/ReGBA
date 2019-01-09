@@ -75,7 +75,9 @@ extern bool ReGBA_AreMenuSettingsEqual(struct Menu* Menu, void* A, void* B);
  * Returns:
  *   The value of the setting being resolved, per-game preferred.
  */
-extern uint32_t ResolveSetting(uint32_t GlobalValue, uint32_t PerGameValue);
+#define ResolveSetting(global, local)			( local != 0 ? local - 1 : global )
+
+ //extern uint32_t ResolveSetting(uint32_t GlobalValue, uint32_t PerGameValue);
 
 /*
  * Resolves the value of a button mapping or hotkey that can be overridden in

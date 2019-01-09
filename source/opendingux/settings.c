@@ -323,13 +323,14 @@ bool ReGBA_AreMenuSettingsEqual(struct Menu* Menu, void* A, void* B)
 	return memcmp(A, B, EntryCount * sizeof(uint32_t)) == 0;
 }
 
-uint32_t ResolveSetting(uint32_t GlobalValue, uint32_t PerGameValue)
-{
-	if (PerGameValue != 0)
-		return PerGameValue - 1;
-	else
-		return GlobalValue;
-}
+
+// inline uint32_t ResolveSetting(uint32_t GlobalValue, uint32_t PerGameValue)
+// {
+	// // if (PerGameValue != 0)
+		// // return PerGameValue - 1;
+	// // else
+		// // return GlobalValue;
+// }
 
 enum OpenDingux_Buttons ResolveButtons(enum OpenDingux_Buttons GlobalValue, enum OpenDingux_Buttons PerGameValue)
 {

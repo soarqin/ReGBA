@@ -21,7 +21,7 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
-TIMER_TYPE timer[4];
+//TIMER_TYPE timer[4];
 
 frameskip_type current_frameskip_type = auto_frameskip;
 u32 frameskip_value = 4;

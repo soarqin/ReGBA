@@ -19,6 +19,10 @@ HEADERS     := cheats.h ../common.h ../cpu_common.h ../cpu.h draw.h main.h    \
                imageio.h ../unifont.h od-input.h settings.h
 
 INCLUDE     := -I. -I.. -I../mips
+OPTIMIZE =  -O2 -mips32 -march=mips32 -mno-mips16 -fomit-frame-pointer -fno-builtin   \
+            -fno-common -Wno-write-strings -Wno-sign-compare -ffast-math -ftree-vectorize \
+			-funswitch-loops -fno-strict-aliasing
+			
 DEFS        := -DGCW_ZERO -DMIPS_XBURST -DLOAD_ALL_ROM                        \
                -DSCREEN_WIDTH=320 -DSCREEN_HEIGHT=240                         \
                -DGIT_VERSION=$(shell git describe --always)
@@ -28,7 +32,7 @@ ifneq ($(HAS_MIPS32R2),)
 endif
 
 CFLAGS      := $(SDL_CFLAGS) -mno-abicalls -Wall -Wno-unused-variable \
-               -O2 -fomit-frame-pointer $(DEFS) $(INCLUDE)
+               -O2 -fomit-frame-pointer $(DEFS) $(INCLUDE) $(OPTIMIZE)
 ASFLAGS     := $(CFLAGS) -D__ASSEMBLY__
 LDFLAGS     := $(SDL_LIBS) -lpthread -lz -lm -lpng
 

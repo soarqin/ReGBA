@@ -70,12 +70,7 @@ void feed_buffer(void *udata, Uint8 *buffer, int len)
 	unsigned int VideoFastForwardedCopy = VideoFastForwarded;
 	if (VideoFastForwardedCopy != AudioFastForwarded)
 	{
-		unsigned int FramesToSkip = (VideoFastForwardedCopy > AudioFastForwarded)
-			? /* no overflow */ VideoFastForwardedCopy - AudioFastForwarded
-			: /* overflow */    0x100 - (AudioFastForwarded - VideoFastForwardedCopy);
-		uint32_t SamplesToSkip = (uint32_t) (FramesToSkip * (OUTPUT_SOUND_FREQUENCY / 59.73f));
-		if (SamplesToSkip > Samples - (Requested * 3 - Requested / 2))
-			SamplesToSkip = Samples - (Requested * 3 - Requested / 2);
+		uint32_t SamplesToSkip = Samples - (Requested * 3 - Requested / 2);
 		ReGBA_DiscardAudioSamples(SamplesToSkip * OUTPUT_FREQUENCY_DIVISOR);
 		Samples -= SamplesToSkip;
 		AudioFastForwarded = VideoFastForwardedCopy;

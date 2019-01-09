@@ -60,7 +60,7 @@ static struct timespec LastProgressUpdate;
 
 void init_video()
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0)
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO /*| SDL_INIT_JOYSTICK*/) < 0)
 	{
 		printf("Failed to initialize SDL !!\n");
 		return;   // for debug
@@ -154,23 +154,25 @@ bool ApplyBorder(const char* Filename)
  *   Scaler copyright (C) 2013 by Paul Cercueil                            *
  *   paul@crapouillou.net                                                  *
  ***************************************************************************/
-static inline uint32_t bgr555_to_rgb565(uint32_t px)
-{
-	return ((px & 0x7c007c00) >> 10)
-	  | ((px & 0x03e003e0) << 1)
-	  | ((px & 0x001f001f) << 11);
-}
+#define bgr555_to_rgb565(px) (((px & 0x7c007c00) >> 10) | ((px & 0x03e003e0) << 1)| ((px & 0x001f001f) << 11))
+// static inline uint32_t bgr555_to_rgb565(uint32_t px)
+// {
+	// return ((px & 0x7c007c00) >> 10)
+	  // | ((px & 0x03e003e0) << 1)
+	  // | ((px & 0x001f001f) << 11);
+// }
 
 /***************************************************************************
  *   16-bit I/O version used by the sub-pixel and bilinear scalers         *
  *   (C) 2013 kuwanger                                                     *
  ***************************************************************************/
-static inline uint16_t bgr555_to_rgb565_16(uint16_t px)
-{
-	return ((px & 0x7c00) >> 10)
-	  | ((px & 0x03e0) << 1)
-	  | ((px & 0x001f) << 11);
-}
+#define bgr555_to_rgb565_16(px) (((px & 0x7c00) >> 10) | ((px & 0x03e0) << 1) | ((px & 0x001f) << 11))
+// static inline uint16_t bgr555_to_rgb565_16(uint16_t px)
+// {
+	// return ((px & 0x7c00) >> 10)
+	  // | ((px & 0x03e0) << 1)
+	  // | ((px & 0x001f) << 11);
+// }
 
 // Explaining the magic constants:
 // F7DEh is the mask to remove the lower bit of all color
@@ -1929,8 +1931,12 @@ void ReGBA_ProgressFinalise()
 void ReGBA_VideoFlip()
 {
 	if (SDL_MUSTLOCK(OutputSurface))
+	{		
 		SDL_UnlockSurface(OutputSurface);
-	SDL_Flip(OutputSurface);
-	if (SDL_MUSTLOCK(OutputSurface))
+		SDL_Flip(OutputSurface);
 		SDL_LockSurface(OutputSurface);
+	}
+	else
+		SDL_Flip(OutputSurface);
+		
 }
