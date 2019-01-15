@@ -1379,6 +1379,25 @@ static inline void gba_render(uint16_t* Dest, uint16_t* Src,
 	}
 }
 
+static inline void gba_render_fast(uint32_t* Dest, uint32_t* Src)
+{
+	const uint32_t DestSkip = 40;	//(ScreenWidth - GBAWidth) / BitPerPixel =   40
+	uint32_t X, Y;
+	
+	Dest += 6420;
+	for (Y = 0; Y < GBA_SCREEN_HEIGHT; Y++)
+	{
+		for (X = 0; X < GBA_SCREEN_WIDTH / 2; X++)
+		{
+			*Dest++ = bgr555_to_rgb565(*Src);
+			Src++;
+		}
+		Dest += DestSkip;
+	}
+		
+}
+
+
 static inline void gba_convert(uint16_t* Dest, uint16_t* Src,
 	uint32_t SrcPitch, uint32_t DestPitch)
 {
@@ -1515,7 +1534,7 @@ void ReGBA_RenderScreen(void)
 			                  images, acts as unscaled */
 #endif
 			case unscaled:
-				gba_render(OutputSurface->pixels, GBAScreen, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_render_fast(OutputSurface->pixels, GBAScreenSurface->pixels);
 				break;
 
 #ifdef NO_SCALING
