@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
     video_resolution_small();
 #endif
 
-    init_cpu(ResolveSetting(BootFromBIOS, PerGameBootFromBIOS) /* in port.c */);
+    init_cpu(!ResolveSetting(BootFromBIOS, PerGameBootFromBIOS) /* in port.c */);
   }
   else
   {
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
       video_resolution_small();
       clear_screen(0);
       flip_screen();
-      init_cpu(ResolveSetting(BootFromBIOS, PerGameBootFromBIOS) /* in port.c */);
+      init_cpu(!ResolveSetting(BootFromBIOS, PerGameBootFromBIOS) /* in port.c */);
     }
 #endif
   }
@@ -558,7 +558,7 @@ void reset_gba()
 {
   init_main();
   init_memory();
-  init_cpu(ResolveSetting(BootFromBIOS, PerGameBootFromBIOS) /* in port.c */);
+  init_cpu(!ResolveSetting(BootFromBIOS, PerGameBootFromBIOS) /* in port.c */);
   reset_sound();
 }
 
