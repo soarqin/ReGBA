@@ -42,17 +42,18 @@ SDL_Surface *BorderSurface = NULL;
 video_scale_type PerGameScaleMode = 0;
 video_scale_type ScaleMode = scaled_aspect;
 
-#define COLOR_PROGRESS_BACKGROUND   RGB888_TO_RGB565(  0,   0,   0)
-#define COLOR_PROGRESS_TEXT_CONTENT RGB888_TO_RGB565(255, 255, 255)
-#define COLOR_PROGRESS_TEXT_OUTLINE RGB888_TO_RGB565(  0,   0,   0)
-#define COLOR_PROGRESS_CONTENT      RGB888_TO_RGB565(  0, 128, 255)
-#define COLOR_PROGRESS_OUTLINE      RGB888_TO_RGB565(255, 255, 255)
+#define COLOR_PROGRESS_BACKGROUND   RGB888_TO_NATIVE(  0,   0,   0)
+#define COLOR_PROGRESS_TEXT_CONTENT RGB888_TO_NATIVE(255, 255, 255)
+#define COLOR_PROGRESS_TEXT_OUTLINE RGB888_TO_NATIVE(  0,   0,   0)
+#define COLOR_PROGRESS_CONTENT      RGB888_TO_NATIVE(  0, 128, 255)
+#define COLOR_PROGRESS_OUTLINE      RGB888_TO_NATIVE(255, 255, 255)
 
 #define PROGRESS_WIDTH 240
 #define PROGRESS_HEIGHT 18
 
-#define NO_SCALING ((SCREEN_WIDTH == GBA_SCREEN_WIDTH) \
-		&& (SCREEN_HEIGHT == GBA_SCREEN_HEIGHT))
+#if (SCREEN_WIDTH == GBA_SCREEN_WIDTH) && (SCREEN_HEIGHT == GBA_SCREEN_HEIGHT)
+#define NO_SCALING
+#endif
 
 static bool InFileAction = false;
 static enum ReGBA_FileAction CurrentFileAction;
@@ -68,11 +69,20 @@ void init_video()
 	}
 
 	SDL_ShowCursor(SDL_DISABLE);
-	OutputSurface = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 16, SDL_HWSURFACE |
-#ifdef SDL_TRIPLEBUF
-		SDL_TRIPLEBUF
+	OutputSurface = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT,
+#ifdef SDL_SWIZZLEBGR
+		15,
 #else
-		SDL_DOUBLEBUF
+		16,
+#endif
+		SDL_HWSURFACE
+#ifdef SDL_TRIPLEBUF
+		| SDL_TRIPLEBUF
+#else
+		| SDL_DOUBLEBUF
+#endif
+#ifdef SDL_SWIZZLEBGR
+		| SDL_SWIZZLEBGR
 #endif
 		);
 	GBAScreenSurface = SDL_CreateRGBSurface(SDL_SWSURFACE, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, 16,
@@ -93,7 +103,17 @@ void SetMenuResolution()
 #ifdef GCW_ZERO
 	if (SDL_MUSTLOCK(OutputSurface))
 		SDL_UnlockSurface(OutputSurface);
-	OutputSurface = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+	OutputSurface = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT,
+#ifdef SDL_SWIZZLEBGR
+		15,
+#else
+		16,
+#endif
+		SDL_HWSURFACE | SDL_DOUBLEBUF
+#ifdef SDL_SWIZZLEBGR
+		| SDL_SWIZZLEBGR
+#endif
+		);
 	if (SDL_MUSTLOCK(OutputSurface))
 		SDL_LockSurface(OutputSurface);
 #endif
@@ -111,11 +131,20 @@ void SetGameResolution()
 	}
 	if (SDL_MUSTLOCK(OutputSurface))
 		SDL_UnlockSurface(OutputSurface);
-	OutputSurface = SDL_SetVideoMode(Width, Height, 16, SDL_HWSURFACE |
-#ifdef SDL_TRIPLEBUF
-		SDL_TRIPLEBUF
+	OutputSurface = SDL_SetVideoMode(Width, Height, 
+#ifdef SDL_SWIZZLEBGR
+		15,
 #else
-		SDL_DOUBLEBUF
+		16,
+#endif
+		SDL_HWSURFACE
+#ifdef SDL_TRIPLEBUF
+		| SDL_TRIPLEBUF
+#else
+		| SDL_DOUBLEBUF
+#endif
+#ifdef SDL_SWIZZLEBGR
+		| SDL_SWIZZLEBGR
 #endif
 		);
 	if (SDL_MUSTLOCK(OutputSurface))
@@ -174,6 +203,14 @@ bool ApplyBorder(const char* Filename)
 	  // | ((px & 0x001f) << 11);
 // }
 
+#ifdef SDL_SWIZZLEBGR
+#define bgr555_to_native(px) (px)
+#define bgr555_to_native_16(px) (px)
+#else
+#define bgr555_to_native bgr555_to_rgb565
+#define bgr555_to_native_16 bgr555_to_rgb565_16
+#endif
+
 // Explaining the magic constants:
 // F7DEh is the mask to remove the lower bit of all color
 // components before dividing them by 2. Otherwise, the lower bit
@@ -204,12 +241,27 @@ bool ApplyBorder(const char* Filename)
 /* Calculates the average of two RGB565 pixels. The source of the pixels is
  * the lower 16 bits of both parameters. The result is in the lower 16 bits.
  */
-#define Average(A, B) ((((A) & 0xF7DE) >> 1) + (((B) & 0xF7DE) >> 1) + ((A) & (B) & 0x0821))
+
+#ifdef SDL_SWIZZLEBGR
+#define MAGIC_VAL1 0x7BDEu
+#define MAGIC_VAL2 0x0421u
+#define MAGIC_VAL3 0x739Cu
+#define MAGIC_VAL4 0x0C63u
+#else
+#define MAGIC_VAL1 0xF7DEu
+#define MAGIC_VAL2 0x0821u
+#define MAGIC_VAL3 0xE79Cu
+#define MAGIC_VAL4 0x1863u
+#endif
+#define MAGIC_DOUBLE(n) ((n << 16) | n)
+#define MAGIC_VAL1D MAGIC_DOUBLE(MAGIC_VAL1)
+#define MAGIC_VAL2D MAGIC_DOUBLE(MAGIC_VAL2)
+#define Average(A, B) ((((A) & MAGIC_VAL1) >> 1) + (((B) & MAGIC_VAL1) >> 1) + ((A) & (B) & MAGIC_VAL2))
 
 /* Calculates the average of two pairs of RGB565 pixels. The result is, in
  * the lower bits, the average of both lower pixels, and in the upper bits,
  * the average of both upper pixels. */
-#define Average32(A, B) ((((A) & 0xF7DEF7DE) >> 1) + (((B) & 0xF7DEF7DE) >> 1) + ((A) & (B) & 0x08210821))
+#define Average32(A, B) ((((A) & MAGIC_VAL1D) >> 1) + (((B) & MAGIC_VAL1D) >> 1) + ((A) & (B) & MAGIC_VAL2D))
 
 /* Raises a pixel from the lower half to the upper half of a pair. */
 #define Raise(N) ((N) << 16)
@@ -224,14 +276,23 @@ bool ApplyBorder(const char* Filename)
  * the lower 16 bits of both parameters. The result is in the lower 16 bits.
  * The average is weighted so that the first pixel contributes 3/4 of its
  * color and the second pixel contributes 1/4. */
-#define AverageQuarters3_1(A, B) ( (((A) & 0xF7DE) >> 1) + (((A) & 0xE79C) >> 2) + (((B) & 0xE79C) >> 2) + ((( (( ((A) & 0x1863) + ((A) & 0x0821) ) << 1) + ((B) & 0x1863) ) >> 2) & 0x1863) )
+#define AverageQuarters3_1(A, B) ( (((A) & MAGIC_VAL1) >> 1) + (((A) & MAGIC_VAL3) >> 2) + (((B) & MAGIC_VAL3) >> 2) + ((( (( ((A) & MAGIC_VAL4) + ((A) & MAGIC_VAL2) ) << 1) + ((B) & MAGIC_VAL4) ) >> 2) & MAGIC_VAL4) )
 
-#define RED_FROM_RGB565(rgb565) (((rgb565) >> 11) & 0x1F)
-#define RED_TO_RGB565(r) (((r) & 0x1F) << 11)
-#define GREEN_FROM_RGB565(rgb565) (((rgb565) >> 5) & 0x3F)
-#define GREEN_TO_RGB565(g) (((g) & 0x3F) << 5)
-#define BLUE_FROM_RGB565(rgb565) ((rgb565) & 0x1F)
-#define BLUE_TO_RGB565(b) ((b) & 0x1F)
+#ifdef SDL_SWIZZLEBGR
+#define RED_FROM_NATIVE(rgb565) ((rgb565) & 0x1F)
+#define RED_TO_NATIVE(r) ((r) & 0x1F)
+#define GREEN_FROM_NATIVE(rgb565) (((rgb565) >> 5) & 0x1F)
+#define GREEN_TO_NATIVE(g) (((g) & 0x1F) << 5)
+#define BLUE_FROM_NATIVE(rgb565) (((rgb565) >> 10) & 0x1F)
+#define BLUE_TO_NATIVE(b) (((b) & 0x1F) << 10)
+#else
+#define RED_FROM_NATIVE(rgb565) (((rgb565) >> 11) & 0x1F)
+#define RED_TO_NATIVE(r) (((r) & 0x1F) << 11)
+#define GREEN_FROM_NATIVE(rgb565) (((rgb565) >> 5) & 0x3F)
+#define GREEN_TO_NATIVE(g) (((g) & 0x3F) << 5)
+#define BLUE_FROM_NATIVE(rgb565) ((rgb565) & 0x1F)
+#define BLUE_TO_NATIVE(b) ((b) & 0x1F)
+#endif
 
 /*
  * Blends, with sub-pixel accuracy, 3/4 of the first argument with 1/4 of the
@@ -240,9 +301,9 @@ bool ApplyBorder(const char* Filename)
  */
 static inline uint16_t SubpixelRGB3_1(uint16_t A, uint16_t B)
 {
-	return RED_TO_RGB565(RED_FROM_RGB565(A))
-	     | GREEN_TO_RGB565(GREEN_FROM_RGB565(A) * 3 / 4 + GREEN_FROM_RGB565(B) * 1 / 4)
-	     | BLUE_TO_RGB565(BLUE_FROM_RGB565(A) * 1 / 4 + BLUE_FROM_RGB565(B) * 3 / 4);
+	return RED_TO_NATIVE(RED_FROM_NATIVE(A))
+	     | GREEN_TO_NATIVE(GREEN_FROM_NATIVE(A) * 3 / 4 + GREEN_FROM_NATIVE(B) * 1 / 4)
+	     | BLUE_TO_NATIVE(BLUE_FROM_NATIVE(A) * 1 / 4 + BLUE_FROM_NATIVE(B) * 3 / 4);
 }
 
 /*
@@ -252,9 +313,9 @@ static inline uint16_t SubpixelRGB3_1(uint16_t A, uint16_t B)
  */
 static inline uint16_t SubpixelRGB1_1(uint16_t A, uint16_t B)
 {
-	return RED_TO_RGB565(RED_FROM_RGB565(A) * 3 / 4 + RED_FROM_RGB565(B) * 1 / 4)
-	     | GREEN_TO_RGB565(GREEN_FROM_RGB565(A) * 1 / 2 + GREEN_FROM_RGB565(B) * 1 / 2)
-	     | BLUE_TO_RGB565(BLUE_FROM_RGB565(A) * 1 / 4 + BLUE_FROM_RGB565(B) * 3 / 4);
+	return RED_TO_NATIVE(RED_FROM_NATIVE(A) * 3 / 4 + RED_FROM_NATIVE(B) * 1 / 4)
+	     | GREEN_TO_NATIVE(GREEN_FROM_NATIVE(A) * 1 / 2 + GREEN_FROM_NATIVE(B) * 1 / 2)
+	     | BLUE_TO_NATIVE(BLUE_FROM_NATIVE(A) * 1 / 4 + BLUE_FROM_NATIVE(B) * 3 / 4);
 }
 
 /*
@@ -264,9 +325,9 @@ static inline uint16_t SubpixelRGB1_1(uint16_t A, uint16_t B)
  */
 static inline uint16_t SubpixelRGB1_3(uint16_t A, uint16_t B)
 {
-	return RED_TO_RGB565(RED_FROM_RGB565(B) * 1 / 4 + RED_FROM_RGB565(A) * 3 / 4)
-	     | GREEN_TO_RGB565(GREEN_FROM_RGB565(B) * 3 / 4 + GREEN_FROM_RGB565(A) * 1 / 4)
-	     | BLUE_TO_RGB565(BLUE_FROM_RGB565(B));
+	return RED_TO_NATIVE(RED_FROM_NATIVE(B) * 1 / 4 + RED_FROM_NATIVE(A) * 3 / 4)
+	     | GREEN_TO_NATIVE(GREEN_FROM_NATIVE(B) * 3 / 4 + GREEN_FROM_NATIVE(A) * 1 / 4)
+	     | BLUE_TO_NATIVE(BLUE_FROM_NATIVE(B));
 }
 
 /* Upscales an image by 33% in width and 50% in height; also does color
@@ -309,9 +370,9 @@ static inline void gba_upscale(uint16_t *to, uint16_t *from,
 			// -- Row 1 --
 			// Read RGB565 elements in the source grid.
 			// The notation is high_low (little-endian).
-			uint32_t b_a = bgr555_to_rgb565(*(uint32_t*) (from    )),
-			         d_c = bgr555_to_rgb565(*(uint32_t*) (from + 2)),
-			         f_e = bgr555_to_rgb565(*(uint32_t*) (from + 4));
+			uint32_t b_a = bgr555_to_native(*(uint32_t*) (from    )),
+			         d_c = bgr555_to_native(*(uint32_t*) (from + 2)),
+			         f_e = bgr555_to_native(*(uint32_t*) (from + 4));
 
 			// Generate ab_a from b_a.
 			*(uint32_t*) (to) = likely(Hi(b_a) == Lo(b_a))
@@ -340,9 +401,9 @@ static inline void gba_upscale(uint16_t *to, uint16_t *from,
 			if (likely(y + 1 < src_y))  // Is there a source row 2?
 			{
 				// -- Row 2 --
-				uint32_t h_g = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch    )),
-				         j_i = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch + 4)),
-				         l_k = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch + 8));
+				uint32_t h_g = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch    )),
+				         j_i = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch + 4)),
+				         l_k = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch + 8));
 
 				// Generate abgh_ag from b_a and h_g.
 				uint32_t bh_ag = Average32(b_a, h_g);
@@ -455,9 +516,9 @@ static inline void gba_upscale_aspect(uint16_t *to, uint16_t *from,
 			// -- Row 1 --
 			// Read RGB565 elements in the source grid.
 			// The notation is high_low (little-endian).
-			uint32_t b_a = bgr555_to_rgb565(*(uint32_t*) (from    )),
-			         d_c = bgr555_to_rgb565(*(uint32_t*) (from + 2)),
-			         f_e = bgr555_to_rgb565(*(uint32_t*) (from + 4));
+			uint32_t b_a = bgr555_to_native(*(uint32_t*) (from    )),
+			         d_c = bgr555_to_native(*(uint32_t*) (from + 2)),
+			         f_e = bgr555_to_native(*(uint32_t*) (from + 4));
 
 			// Generate ab_a from b_a.
 			*(uint32_t*) (to) = likely(Hi(b_a) == Lo(b_a))
@@ -486,9 +547,9 @@ static inline void gba_upscale_aspect(uint16_t *to, uint16_t *from,
 			if (likely(y + 1 < src_y))  // Is there a source row 2?
 			{
 				// -- Row 2 --
-				uint32_t h_g = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch    )),
-				         j_i = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch + 4)),
-				         l_k = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch + 8));
+				uint32_t h_g = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch    )),
+				         j_i = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch + 4)),
+				         l_k = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch + 8));
 
 				// Generate abgh_ag from b_a and h_g.
 				uint32_t bh_ag = Average32(b_a, h_g);
@@ -525,9 +586,9 @@ static inline void gba_upscale_aspect(uint16_t *to, uint16_t *from,
 				if (likely(y + 2 < src_y))  // Is there a source row 3?
 				{
 					// -- Row 3 --
-					uint32_t n_m = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch * 2    )),
-					         p_o = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch * 2 + 4)),
-					         r_q = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) from + src_pitch * 2 + 8));
+					uint32_t n_m = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch * 2    )),
+					         p_o = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch * 2 + 4)),
+					         r_q = bgr555_to_native(*(uint32_t*) ((uint8_t*) from + src_pitch * 2 + 8));
 
 					// Generate ghmn_gm from h_g and n_m.
 					uint32_t hn_gm = Average32(h_g, n_m);
@@ -636,10 +697,10 @@ static inline void gba_upscale_subpixel(uint16_t *to, uint16_t *from,
 			 * a b c | d
 			 * e f g | h
 			 */
-			uint32_t a = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from    )),
-			         b = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 2)),
-			         c = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 4)),
-			         d = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + rightCol));
+			uint32_t a = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from    )),
+			         b = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 2)),
+			         c = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 4)),
+			         d = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + rightCol));
 			// The 4 output pixels in a row use 0.75, 1.5 then 2.25 as the X
 			// coordinate for interpolation.
 
@@ -665,10 +726,10 @@ static inline void gba_upscale_subpixel(uint16_t *to, uint16_t *from,
 
 			// -- Row 2 --
 			// All pixels in this row are blended from the two rows.
-			uint32_t e = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
-			         f = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
-			         g = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
-			         h = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
+			uint32_t e = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
+			         f = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
+			         g = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
+			         h = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
 
 			// -- Row 2 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch) = likely(a == e)
@@ -779,10 +840,10 @@ static inline void gba_upscale_aspect_subpixel(uint16_t *to, uint16_t *from,
 			 * ---------
 			 * m n o | p
 			 */
-			uint32_t a = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from    )),
-			         b = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 2)),
-			         c = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 4)),
-			         d = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + rightCol));
+			uint32_t a = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from    )),
+			         b = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 2)),
+			         c = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 4)),
+			         d = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + rightCol));
 			// The 4 output pixels in a row use 0.75, 1.5 then 2.25 as the X
 			// coordinate for interpolation.
 
@@ -809,10 +870,10 @@ static inline void gba_upscale_aspect_subpixel(uint16_t *to, uint16_t *from,
 
 			// -- Row 2 --
 			// All pixels in this row use 0.75 as the Y coordinate.
-			uint32_t e = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
-			         f = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
-			         g = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
-			         h = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
+			uint32_t e = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
+			         f = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
+			         g = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
+			         h = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
 
 			// -- Row 2 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch) = likely(a == e)
@@ -854,10 +915,10 @@ static inline void gba_upscale_aspect_subpixel(uint16_t *to, uint16_t *from,
 
 			// -- Row 3 --
 			// All pixels in this row use 1.5 as the Y coordinate.
-			uint32_t i = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2    )),
-			         j = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 2)),
-			         k = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 4)),
-			         l = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + rightCol));
+			uint32_t i = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2    )),
+			         j = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 2)),
+			         k = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 4)),
+			         l = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + rightCol));
 
 			// -- Row 3 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch * 2) = likely(e == i)
@@ -890,10 +951,10 @@ static inline void gba_upscale_aspect_subpixel(uint16_t *to, uint16_t *from,
 
 			// -- Row 4 --
 			// All pixels in this row use 2.25 as the Y coordinate.
-			uint32_t m = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3    )),
-			         n = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 2)),
-			         o = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 4)),
-			         p = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + rightCol));
+			uint32_t m = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3    )),
+			         n = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 2)),
+			         o = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 4)),
+			         p = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + rightCol));
 
 			// -- Row 4 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch * 3) = likely(i == m)
@@ -946,10 +1007,10 @@ static inline void gba_upscale_aspect_subpixel(uint16_t *to, uint16_t *from,
 			 *
 			 * a b c | d
 			 */
-			uint32_t a = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from    )),
-			         b = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 2)),
-			         c = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 4)),
-			         d = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + rightCol));
+			uint32_t a = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from    )),
+			         b = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 2)),
+			         c = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 4)),
+			         d = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + rightCol));
 			// The 4 output pixels in a row use 0.75, 1.5 then 2.25 as the X
 			// coordinate for interpolation.
 
@@ -1017,10 +1078,10 @@ static inline void gba_upscale_aspect_bilinear(uint16_t *to, uint16_t *from,
 			 * ---------
 			 * m n o | p
 			 */
-			uint32_t a = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from    )),
-			         b = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 2)),
-			         c = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 4)),
-			         d = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + rightCol));
+			uint32_t a = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from    )),
+			         b = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 2)),
+			         c = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 4)),
+			         d = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + rightCol));
 			// The 4 output pixels in a row use 0.75, 1.5 then 2.25 as the X
 			// coordinate for interpolation.
 
@@ -1047,10 +1108,10 @@ static inline void gba_upscale_aspect_bilinear(uint16_t *to, uint16_t *from,
 
 			// -- Row 2 --
 			// All pixels in this row use 0.75 as the Y coordinate.
-			uint32_t e = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
-			         f = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
-			         g = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
-			         h = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
+			uint32_t e = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
+			         f = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
+			         g = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
+			         h = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
 
 			// -- Row 2 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch) = likely(a == e)
@@ -1092,10 +1153,10 @@ static inline void gba_upscale_aspect_bilinear(uint16_t *to, uint16_t *from,
 
 			// -- Row 3 --
 			// All pixels in this row use 1.5 as the Y coordinate.
-			uint32_t i = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2    )),
-			         j = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 2)),
-			         k = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 4)),
-			         l = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + rightCol));
+			uint32_t i = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2    )),
+			         j = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 2)),
+			         k = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + 4)),
+			         l = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 2 + rightCol));
 
 			// -- Row 3 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch * 2) = likely(e == i)
@@ -1128,10 +1189,10 @@ static inline void gba_upscale_aspect_bilinear(uint16_t *to, uint16_t *from,
 
 			// -- Row 4 --
 			// All pixels in this row use 2.25 as the Y coordinate.
-			uint32_t m = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3    )),
-			         n = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 2)),
-			         o = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 4)),
-			         p = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + rightCol));
+			uint32_t m = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3    )),
+			         n = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 2)),
+			         o = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + 4)),
+			         p = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch * 3 + rightCol));
 
 			// -- Row 4 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch * 3) = likely(i == m)
@@ -1184,10 +1245,10 @@ static inline void gba_upscale_aspect_bilinear(uint16_t *to, uint16_t *from,
 			 *
 			 * a b c | d
 			 */
-			uint32_t a = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from    )),
-			         b = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 2)),
-			         c = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 4)),
-			         d = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + rightCol));
+			uint32_t a = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from    )),
+			         b = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 2)),
+			         c = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 4)),
+			         d = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + rightCol));
 			// The 4 output pixels in a row use 0.75, 1.5 then 2.25 as the X
 			// coordinate for interpolation.
 
@@ -1252,10 +1313,10 @@ static inline void gba_upscale_bilinear(uint16_t *to, uint16_t *from,
 			 * a b c | d
 			 * e f g | h
 			 */
-			uint32_t a = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from    )),
-			         b = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 2)),
-			         c = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + 4)),
-			         d = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + rightCol));
+			uint32_t a = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from    )),
+			         b = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 2)),
+			         c = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + 4)),
+			         d = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + rightCol));
 			// The 4 output pixels in a row use 0.75, 1.5 then 2.25 as the X
 			// coordinate for interpolation.
 
@@ -1281,10 +1342,10 @@ static inline void gba_upscale_bilinear(uint16_t *to, uint16_t *from,
 
 			// -- Row 2 --
 			// All pixels in this row are blended from the two rows.
-			uint32_t e = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
-			         f = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
-			         g = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
-			         h = bgr555_to_rgb565_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
+			uint32_t e = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch    )),
+			         f = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 2)),
+			         g = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + 4)),
+			         h = bgr555_to_native_16(*(uint16_t*) ((uint8_t*) from + src_pitch + rightCol));
 
 			// -- Row 2 pixel 1 (X = 0) --
 			*(uint16_t*) ((uint8_t*) to + dst_pitch) = likely(a == e)
@@ -1370,7 +1431,7 @@ static inline void gba_render(uint16_t* Dest, uint16_t* Src,
 	{
 		for (X = 0; X < GBA_SCREEN_WIDTH * sizeof(uint16_t) / sizeof(uint32_t); X++)
 		{
-			*(uint32_t*) Dest = bgr555_to_rgb565(*(uint32_t*) Src);
+			*(uint32_t*) Dest = bgr555_to_native(*(uint32_t*) Src);
 			Dest += 2;
 			Src += 2;
 		}
@@ -1389,7 +1450,7 @@ static inline void gba_render_fast(uint32_t* Dest, uint32_t* Src)
 	{
 		for (X = 0; X < GBA_SCREEN_WIDTH / 2; X++)
 		{
-			*Dest++ = bgr555_to_rgb565(*Src);
+			*Dest++ = bgr555_to_native(*Src);
 			Src++;
 		}
 		Dest += DestSkip;
@@ -1409,7 +1470,7 @@ static inline void gba_convert(uint16_t* Dest, uint16_t* Src,
 	{
 		for (X = 0; X < GBA_SCREEN_WIDTH * sizeof(uint16_t) / sizeof(uint32_t); X++)
 		{
-			*(uint32_t*) Dest = bgr555_to_rgb565(*(uint32_t*) Src);
+			*(uint32_t*) Dest = bgr555_to_native(*(uint32_t*) Src);
 			Dest += 2;
 			Src += 2;
 		}
@@ -1455,10 +1516,10 @@ void gba_render_half(uint16_t* Dest, uint16_t* Src, uint32_t DestX, uint32_t Des
 			* After (multiple letters = average):
 			*    abef cdgh
 			*/
-			uint32_t b_a = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) Src    )),
-			         d_c = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) Src + 4)),
-			         f_e = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) Src + SrcPitch    )),
-			         h_g = bgr555_to_rgb565(*(uint32_t*) ((uint8_t*) Src + SrcPitch + 4));
+			uint32_t b_a = bgr555_to_native(*(uint32_t*) ((uint8_t*) Src    )),
+			         d_c = bgr555_to_native(*(uint32_t*) ((uint8_t*) Src + 4)),
+			         f_e = bgr555_to_native(*(uint32_t*) ((uint8_t*) Src + SrcPitch    )),
+			         h_g = bgr555_to_native(*(uint32_t*) ((uint8_t*) Src + SrcPitch + 4));
 			uint32_t bf_ae = likely(b_a == f_e)
 				? b_a
 				: Average32(b_a, f_e);

@@ -90,10 +90,18 @@ void SetGameResolution();
  */
 extern uint16_t* copy_screen();
 
-#define RGB888_TO_RGB565(r, g, b) ( \
+#ifdef SDL_SWIZZLEBGR
+#define RGB888_TO_NATIVE(r, g, b) ( \
+  (((b) & 0xF8) << 7) | \
+  (((g) & 0xF8) << 2) | \
+  (((r) & 0xF8) >> 3) \
+  )
+#else
+#define RGB888_TO_NATIVE(r, g, b) ( \
   (((r) & 0xF8) << 8) | \
   (((g) & 0xFC) << 3) | \
   (((b) & 0xF8) >> 3) \
   )
+#endif
 
 #endif /* __DRAW_H__ */
