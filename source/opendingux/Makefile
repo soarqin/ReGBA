@@ -26,6 +26,10 @@ OPTIMIZE =  -O2 -mno-mips16 -fomit-frame-pointer -fno-builtin   \
 DEFS        := -DGCW_ZERO -DMIPS_XBURST -DLOAD_ALL_ROM                        \
                -DSCREEN_WIDTH=320 -DSCREEN_HEIGHT=240                         \
                -DGIT_VERSION=$(shell git describe --always)
+
+ifdef RG350
+	DEFS += -DRG350
+endif
 HAS_MIPS32R2 := $(shell echo | $(CC) -dM -E - |grep _MIPS_ARCH_MIPS32R2)
 ifneq ($(HAS_MIPS32R2),)
 	DEFS += -DMIPS_32R2
