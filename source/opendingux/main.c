@@ -20,6 +20,8 @@
 #include "common.h"
 #include <sys/time.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <libgen.h>
 
 //TIMER_TYPE timer[4];
 
@@ -144,23 +146,28 @@ int main(int argc, char *argv[])
   char load_filename[512];
   char file[MAX_PATH + 1];
 
-	// Copy the path of the executable into executable_path
-	if (realpath(argv[0], executable_path) == 0)
-	{
-		fprintf(stderr, "Failed to get the path to the ReGBA executable: %s\n", strerror(errno));
-		fprintf(stderr, "Some bundled files will not be loaded correctly.\n");
-		executable_path[0] = '\0';
-	}
-	else
-	{
-		char* LastSlash = strrchr(executable_path, '/');
-		if (LastSlash)
-		{
-			*LastSlash = '\0';
-		}
-	}
+  ssize_t count = readlink("/proc/self/exe", file, 256);
+  // Copy the path of the executable into executable_path
+  if (count == -1)
+  {
+    fprintf(stderr, "Failed to get the path to the ReGBA executable: %s\n", strerror(errno));
+    fprintf(stderr, "Some bundled files will not be loaded correctly.\n");
+    executable_path[0] = '\0';
+  }
+  else
+  {
+    const char *exedir = dirname(file);
+    if (exedir != NULL)
+    {
+      strcpy(executable_path, exedir);
+    }
+    else
+    {
+      executable_path[0] = '\0';
+    }
+  }
 
-	init_video();
+  init_video();
 
   // Copy the user's .gpsp directory into main_path
   sprintf(main_path, "%s/.gpsp", getenv("HOME"));
@@ -171,45 +178,45 @@ int main(int argc, char *argv[])
   load_config_file();
 #endif
 
-	// Try loading the user's .gpsp directory's GBA BIOS first.
-	// Fall back on the bundled one.
-	ReGBA_ProgressInitialise(FILE_ACTION_LOAD_BIOS);
-	sprintf(file, "%s/gba_bios.bin", main_path);
-	if(load_bios(file) == -1)
-	{
-		ReGBA_ProgressUpdate(1, 2);
-		sprintf(file, "%s/gba_bios.bin", executable_path);
-		if (load_bios(file) == -1)
-		{
-			ShowErrorScreen("The GBA BIOS was not found in any location. "
-				"You can load one in your home directory's .gpsp "
-				"subdirectory. On this platform, that's:\n%s\nThe file needs "
-				"to be named gba_bios.bin.", main_path);
+  // Try loading the user's .gpsp directory's GBA BIOS first.
+  // Fall back on the bundled one.
+  ReGBA_ProgressInitialise(FILE_ACTION_LOAD_BIOS);
+  sprintf(file, "%s/gba_bios.bin", main_path);
+  if(load_bios(file) == -1)
+  {
+    ReGBA_ProgressUpdate(1, 2);
+    sprintf(file, "%s/gba_bios.bin", executable_path);
+    if (load_bios(file) == -1)
+    {
+      ShowErrorScreen("The GBA BIOS was not found in any location. "
+        "You can load one in your home directory's .gpsp "
+        "subdirectory. On this platform, that's:\n%s\nThe file needs "
+        "to be named gba_bios.bin.", main_path);
 
-			error_quit();
-		}
-		else
-			ReGBA_ProgressUpdate(2, 2);
-	}
-	else
-		ReGBA_ProgressUpdate(2, 2);
-	ReGBA_ProgressFinalise();
+      error_quit();
+    }
+    else
+      ReGBA_ProgressUpdate(2, 2);
+  }
+  else
+    ReGBA_ProgressUpdate(2, 2);
+  ReGBA_ProgressFinalise();
 
-	init_main();
-	init_sdlaudio();
-	init_sound();
+  init_main();
+  init_sdlaudio();
+  init_sound();
 
-	// Try loading a border from the user's .gpsp directory first.
-	// Fall back on the bundled one.
-	sprintf(file, "%s/border.png", main_path);
-	if (!ApplyBorder(file))
-	{
-		sprintf(file, "%s/regba-sp-border-silver.png", executable_path);
-		if (!ApplyBorder(file))
-		{
-			fprintf(stderr, "Failed to load a GBA border. None will be shown in unscaled modes.\n");
-		}
-	}
+  // Try loading a border from the user's .gpsp directory first.
+  // Fall back on the bundled one.
+  sprintf(file, "%s/border.png", main_path);
+  if (!ApplyBorder(file))
+  {
+    sprintf(file, "%s/regba-sp-border-silver.png", executable_path);
+    if (!ApplyBorder(file))
+    {
+      fprintf(stderr, "Failed to load a GBA border. None will be shown in unscaled modes.\n");
+    }
+  }
 
 
 #if 0
@@ -218,23 +225,23 @@ int main(int argc, char *argv[])
 
   if(argc > 1)
   {
-		if(load_gamepak(argv[1]) == -1)
-		{
-			if (errno != 0)
-				ShowErrorScreen("Loading ROM failed: %s", strerror(errno));
-			else
-				ShowErrorScreen("Loading ROM failed: File format invalid");
-			error_quit();
-		}
+    if(load_gamepak(argv[1]) == -1)
+    {
+      if (errno != 0)
+        ShowErrorScreen("Loading ROM failed: %s", strerror(errno));
+      else
+        ShowErrorScreen("Loading ROM failed: File format invalid");
+      error_quit();
+    }
 
-		if (IsGameLoaded)
-		{
-			char FileNameNoExt[MAX_PATH + 1];
-			GetFileNameNoExtension(FileNameNoExt, CurrentGamePath);
-			ReGBA_LoadSettings(FileNameNoExt, true);
-		}
+    if (IsGameLoaded)
+    {
+      char FileNameNoExt[MAX_PATH + 1];
+      GetFileNameNoExtension(FileNameNoExt, CurrentGamePath);
+      ReGBA_LoadSettings(FileNameNoExt, true);
+    }
 #if 0
-	init_input();
+  init_input();
 
     set_gba_resolution(screen_scale);
     video_resolution_small();
@@ -245,15 +252,15 @@ int main(int argc, char *argv[])
   else
   {
       fprintf(stderr, "No ROM was specified was on the command line.\n");
-	    error_quit();
+      error_quit();
 #if 0
-	init_video();
-	init_sound();
-	init_input();
+  init_video();
+  init_sound();
+  init_input();
 
     if(load_file(file_ext, load_filename) == -1)
     {
-		ReGBA_Menu(REGBA_MENU_ENTRY_REASON_NO_ROM);
+    ReGBA_Menu(REGBA_MENU_ENTRY_REASON_NO_ROM);
     }
     else
     {
@@ -377,9 +384,9 @@ u32 update_gba()
 
           update_gbc_sound(cpu_ticks);
 
-		Stats.EmulatedFrames++;
-		Stats.TotalEmulatedFrames++;
-		ReGBA_RenderScreen();
+          Stats.EmulatedFrames++;
+          Stats.TotalEmulatedFrames++;
+          ReGBA_RenderScreen();
 
           update_backup();
 
@@ -474,7 +481,7 @@ void synchronize()
     print_string(ssmsg, 0xF000, 0x000, 180, 30);
     strcpy(ssmsg, "     ");
     frames = 0;
-	skipped_num_frame = 60;
+  skipped_num_frame = 60;
   }
 
   if(current_frameskip_type == manual_frameskip)
@@ -505,26 +512,26 @@ void synchronize()
      if(synchronize_flag)
        do {
           synchronize_sound();
-	      gettimeofday(&now, NULL);
+        gettimeofday(&now, NULL);
        } while (timercmp(&next1, &now, >));
-	 else
+   else
       gettimeofday(&now, NULL);
       //timersub(&next1, &now, &tdiff);
-	  //usleep(tdiff.tv_usec/2);
-	  //gettimeofday(&now, NULL);
-	  skipped_num = 0;
-	  next1 = now;
+    //usleep(tdiff.tv_usec/2);
+    //gettimeofday(&now, NULL);
+    skipped_num = 0;
+    next1 = now;
     } else {
       if(skipped_num < frameskip_value) {
         skipped_num++;
-	    skipped_num_frame--;
+      skipped_num_frame--;
         skip_next_frame = 1;
       } else {
         //synchronize_sound();
         skipped_num = 0;
-	    next1 = now;
+      next1 = now;
       }
-	}
+  }
     next1.tv_usec += 16667;
     if(next1.tv_usec >= 1000000) {
       next1.tv_sec++;
@@ -536,22 +543,22 @@ void synchronize()
 
 static void quit_common()
 {
-	if(IsGameLoaded)
-		update_backup_force();
+  if(IsGameLoaded)
+    update_backup_force();
 
-	SDL_Quit();
+  SDL_Quit();
 }
 
 void quit()
 {
-	quit_common();
-	exit(0);
+  quit_common();
+  exit(0);
 }
 
 void error_quit()
 {
-	quit_common();
-	exit(1);
+  quit_common();
+  exit(1);
 }
 
 void reset_gba()
