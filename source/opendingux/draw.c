@@ -1448,12 +1448,18 @@ static inline void gba_render_fast(uint32_t* Dest, uint32_t* Src)
 	Dest += 6420;
 	for (Y = 0; Y < GBA_SCREEN_HEIGHT; Y++)
 	{
+#ifdef SDL_SWIZZLEBGR
+		memmove(Dest, Src, GBA_SCREEN_WIDTH * sizeof(uint16_t));
+		Src += GBA_SCREEN_WIDTH / 2;
+		Dest += GBA_SCREEN_WIDTH / 2 + DestSkip;
+#else
 		for (X = 0; X < GBA_SCREEN_WIDTH / 2; X++)
 		{
 			*Dest++ = bgr555_to_native(*Src);
 			Src++;
 		}
 		Dest += DestSkip;
+#endif
 	}
 		
 }
@@ -1462,12 +1468,19 @@ static inline void gba_render_fast(uint32_t* Dest, uint32_t* Src)
 static inline void gba_convert(uint16_t* Dest, uint16_t* Src,
 	uint32_t SrcPitch, uint32_t DestPitch)
 {
+#ifndef SDL_SWIZZLEBGR
 	uint32_t SrcSkip = SrcPitch - GBA_SCREEN_WIDTH * sizeof(uint16_t);
 	uint32_t DestSkip = DestPitch - GBA_SCREEN_WIDTH * sizeof(uint16_t);
+#endif
 
 	uint32_t X, Y;
 	for (Y = 0; Y < GBA_SCREEN_HEIGHT; Y++)
 	{
+#ifdef SDL_SWIZZLEBGR
+		memmove(Dest, Src, GBA_SCREEN_WIDTH * sizeof(uint16_t));
+		Src = (uint16_t*) ((uint8_t*) Src + SrcPitch);
+		Dest = (uint16_t*) ((uint8_t*) Dest + DestPitch);
+#else
 		for (X = 0; X < GBA_SCREEN_WIDTH * sizeof(uint16_t) / sizeof(uint32_t); X++)
 		{
 			*(uint32_t*) Dest = bgr555_to_native(*(uint32_t*) Src);
@@ -1476,6 +1489,7 @@ static inline void gba_convert(uint16_t* Dest, uint16_t* Src,
 		}
 		Src = (uint16_t*) ((uint8_t*) Src + SrcSkip);
 		Dest = (uint16_t*) ((uint8_t*) Dest + DestSkip);
+#endif
 	}
 }
 
@@ -1638,6 +1652,7 @@ void ReGBA_RenderScreen(void)
 #ifdef GCW_ZERO
 			case hardware:
 				gba_convert(OutputSurface->pixels, GBAScreen, GBAScreenSurface->pitch, OutputSurface->pitch);
+				break;
 #endif
 #endif /* NO_SCALING */
 		}
