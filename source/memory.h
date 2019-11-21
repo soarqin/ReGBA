@@ -222,7 +222,7 @@ extern uint16_t io_registers  [ 0x4000];
 extern uint8_t  ewram_data    [0x40000];
 extern uint8_t  iwram_data    [ 0x8000];
 extern uint8_t  vram          [0x18000];
-struct BIOS_DATA bios;
+extern struct BIOS_DATA bios;
 extern uint8_t  gamepak_backup[0x20000];
 
 #ifndef USE_C_CORE

@@ -158,6 +158,7 @@ uint8_t cpu_waitstate_cycles_seq[2][16] =
 uint32_t prescale_table[] = { 0, 6, 8, 10 };
 
 bool IsNintendoBIOS = false;
+struct BIOS_DATA bios;
 
 // GBA memory areas.
 
