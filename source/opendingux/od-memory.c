@@ -43,6 +43,7 @@ uint8_t* ReGBA_MapEntireROM(FILE_TAG_TYPE File, size_t Size)
 	}
 	return Result;
 #elif defined LOAD_ALL_ROM
+#define BLOCK_SIZE (256 * 1024)
 	// The file is kept open for us. But we close it.
 	uint8_t* Result = malloc(Size);
 	if (Result != NULL)
@@ -50,13 +51,13 @@ uint8_t* ReGBA_MapEntireROM(FILE_TAG_TYPE File, size_t Size)
 		ReGBA_ProgressInitialise(FILE_ACTION_LOAD_ROM_FROM_FILE);
 		uint8_t* Ptr = Result;
 		size_t Read, Next, Done = 0;
-		Next = Size - Done < 65536 ? Size - Done : 65536;
+		Next = Size - Done < BLOCK_SIZE ? Size - Done : BLOCK_SIZE;
 		while ((Read = FILE_READ(File, Ptr, Next)) > 0)
 		{
 			Ptr += Read;
 			Done += Read;
 			ReGBA_ProgressUpdate(Done, Size);
-			Next = Size - Done < 65536 ? Size - Done : 65536;
+			Next = Size - Done < BLOCK_SIZE ? Size - Done : BLOCK_SIZE;
 		}
 		ReGBA_ProgressFinalise();
 #  if TRACE_MEMORY
