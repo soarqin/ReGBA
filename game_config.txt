@@ -1161,6 +1161,18 @@ game_code = ALFJ
 vender_code = D9
 save_type = eeprom
 
+# Dragon Ball Z - The Legacy of Goku II (U)
+game_name = DBZLGCYGOKU2
+game_code = ALFE
+vender_code = 70
+save_type = eeprom
+
+# Dragon Ball Z - Buu's Fury (U)
+game_name = DBZBUUSFURY
+game_code = BG3E
+vender_code = 70
+save_type = eeprom
+
 # Castlevania: Circle of the Moon (E)
 game_name = DRACULA AGB1
 game_code = AAMP
