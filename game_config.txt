@@ -1167,6 +1167,12 @@ game_code = ALFE
 vender_code = 70
 save_type = eeprom
 
+# Dragon Ball Z - The Legacy of Goku II (E)
+game_name = DRAGONBALL Z
+game_code = ALFP
+vender_code = 70
+save_type = eeprom
+
 # Dragon Ball Z - Taiketsu (U)
 game_name = DBZ TAIKETSU
 game_code = BDBE
