@@ -56,7 +56,9 @@ uint32_t OpenDinguxKeys[OPENDINGUX_BUTTON_COUNT] = {
 	0,
 	0,
 	0,
-#ifdef RG350
+#ifdef PLAYGO
+	SDLK_RCTRL       // PLAYGO: Menu face button
+#elif defined RG350
 	SDLK_HOME,       // RG359: Quick flick of Power
 #else
 	SDLK_3,          // GCW: Quick flick of Power
