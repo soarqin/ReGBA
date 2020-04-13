@@ -60,8 +60,8 @@ uint32_t OpenDinguxKeys[OPENDINGUX_BUTTON_COUNT] = {
 	SDLK_RSHIFT,     // PLAYGO: L2
 	SDLK_RALT,       // PLAYGO: R2
 #elif defined RG350
-	SDLK_BACKSPACE,  // RG350: L2
-	SDLK_PAGEUP,     // RG350: R2
+	SDLK_PAGEUP,     // RG350: L2
+	SDLK_PAGEDOWN,   // RG350: R2
 #else
 	0,
 	0,
