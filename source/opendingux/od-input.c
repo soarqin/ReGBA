@@ -32,8 +32,8 @@ uint32_t AnalogAction = 0;
 
 uint_fast8_t FastForwardFrameskipControl = 0;
 
-//static SDL_Joystick* Joystick;
-
+// left analog joystick
+static SDL_Joystick* Joystick;
 static bool JoystickInitialised = false;
 
 // Mandatory remapping for OpenmDingux keys. Each OpenmDingux key maps to a
@@ -360,33 +360,27 @@ enum OpenDingux_Buttons GetPressedOpenDinguxButtons()
 
 static void EnsureJoystick()
 {
-	// if (!JoystickInitialised)
-	// {
-		// JoystickInitialised = true;
-		// Joystick = SDL_JoystickOpen(0);
-		// if (Joystick == NULL)
-		// {
-			// ReGBA_Trace("I: Joystick #0 could not be opened");
-		// }
-	// }
+	if (!JoystickInitialised)
+	{
+		JoystickInitialised = true;
+		Joystick = SDL_JoystickOpen(0);
+		if (Joystick == NULL)
+		{
+			ReGBA_Trace("I: Joystick #0 could not be opened");
+		}
+	}
 }
 
 int16_t GetHorizontalAxisValue()
 {
-	// EnsureJoystick();
-	// if (Joystick != NULL)
-		// return SDL_JoystickGetAxis(Joystick, 0);
-	// else
-		return 0;
+	EnsureJoystick();
+	return (Joystick != NULL) ? SDL_JoystickGetAxis(Joystick, 0) : 0;
 }
 
 int16_t GetVerticalAxisValue()
 {
-	// EnsureJoystick();
-	// if (Joystick != NULL)
-		// return SDL_JoystickGetAxis(Joystick, 1);
-	// else
-		return 0;
+	EnsureJoystick();
+	return (Joystick != NULL) ? SDL_JoystickGetAxis(Joystick, 1) : 0;
 }
 
 enum GUI_ActionRepeatState
