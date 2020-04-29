@@ -120,7 +120,8 @@ extern int16_t GetVerticalAxisValue();
  */
 extern enum GUI_Action GetGUIAction();
 
-#if defined GCW_ZERO
+// X and Y labels are inverted in some devices
+#if defined(GCW_ZERO) && !defined(RG350)
 #  define LEFT_FACE_BUTTON_NAME "X"
 #  define TOP_FACE_BUTTON_NAME "Y"
 #else
