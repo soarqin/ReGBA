@@ -32,7 +32,7 @@ uint32_t AnalogAction = 0;
 
 uint_fast8_t FastForwardFrameskipControl = 0;
 
-// left analog joystick
+// used for the analog sticks
 static SDL_Joystick* Joystick;
 static bool JoystickInitialised = false;
 
@@ -50,29 +50,35 @@ uint32_t OpenDinguxKeys[OPENDINGUX_BUTTON_COUNT] = {
 	SDLK_ESCAPE,     // Select
 	SDLK_LALT,       // Lower face button (B)
 	SDLK_LCTRL,      // Right face button (A)
-	SDLK_LSHIFT,     // Left face button (GCW X, A320 Y)
-	SDLK_SPACE,      // Upper face button (GCW Y, A320 X)
-	0,
-	0,
-	0,
-	0,
-#ifdef PLAYGO
-	SDLK_RSHIFT,     // PLAYGO: L2
-	SDLK_RALT,       // PLAYGO: R2
-#elif defined RG350
+	SDLK_LSHIFT,     // Left face button (GCW X, A320/RG350 Y)
+	SDLK_SPACE,      // Upper face button (GCW Y, A320/RG350 X)
+#ifdef RG350
 	SDLK_PAGEUP,     // RG350: L2
 	SDLK_PAGEDOWN,   // RG350: R2
-#else
-	0,
-	0,
-#endif
-#ifdef PLAYGO
-	SDLK_RCTRL,      // PLAYGO: Menu face button
-#elif defined RG350
+	SDLK_KP_DIVIDE,  // RG350: L3
+	SDLK_KP_PERIOD,  // RG350: R3
 	SDLK_HOME,       // RG350: Quick flick of Power
+#elif defined PLAYGO
+	SDLK_RSHIFT,     // PLAYGO: L2
+	SDLK_RALT,       // PLAYGO: R2
+	0,               // no L3
+	0,               // no R3
+	SDLK_RCTRL,      // PLAYGO: Menu face button
 #else
+	0,               // no L2
+	0,               // no R2
+	0,               // no L3
+	0,               // no R3
 	SDLK_3,          // GCW: Quick flick of Power
 #endif
+	0,               // Left analog down
+	0,               // Left analog up
+	0,               // Left analog left
+	0,               // Left analog right
+	0,               // Right analog down
+	0,               // Right analog up
+	0,               // Right analog left
+	0,               // Right analog right
 };
 
 // These must be OpenDingux buttons at the bit suitable for the ReGBA_Buttons
@@ -142,12 +148,12 @@ enum OpenDingux_Buttons Hotkeys[5] = {
 // pressed. For example, when the user keeps a direction pressed but also
 // presses A, start ignoring the direction.
 enum OpenDingux_Buttons MenuKeys[7] = {
-	OPENDINGUX_BUTTON_FACE_RIGHT,                     // Select/Enter button
-	OPENDINGUX_BUTTON_FACE_DOWN,                      // Cancel/Leave button
-	OPENDINGUX_BUTTON_DOWN  | OPENDINGUX_ANALOG_DOWN, // Menu navigation
-	OPENDINGUX_BUTTON_UP    | OPENDINGUX_ANALOG_UP,
-	OPENDINGUX_BUTTON_RIGHT | OPENDINGUX_ANALOG_RIGHT,
-	OPENDINGUX_BUTTON_LEFT  | OPENDINGUX_ANALOG_LEFT,
+	OPENDINGUX_BUTTON_FACE_RIGHT,                       // Select/Enter button
+	OPENDINGUX_BUTTON_FACE_DOWN,                        // Cancel/Leave button
+	OPENDINGUX_BUTTON_DOWN  | OPENDINGUX_L_ANALOG_DOWN, // Menu navigation
+	OPENDINGUX_BUTTON_UP    | OPENDINGUX_L_ANALOG_UP,
+	OPENDINGUX_BUTTON_RIGHT | OPENDINGUX_L_ANALOG_RIGHT,
+	OPENDINGUX_BUTTON_LEFT  | OPENDINGUX_L_ANALOG_LEFT,
 	OPENDINGUX_BUTTON_SELECT,
 };
 
@@ -202,14 +208,28 @@ static void UpdateOpenDinguxButtons()
 		}
 	}
 
-	CurButtons &= ~(OPENDINGUX_ANALOG_LEFT | OPENDINGUX_ANALOG_RIGHT
-	               | OPENDINGUX_ANALOG_UP | OPENDINGUX_ANALOG_DOWN);
-	int16_t X = GetHorizontalAxisValue(), Y = GetVerticalAxisValue(),
-	        Threshold = (4 - ResolveSetting(AnalogSensitivity, PerGameAnalogSensitivity)) * 7808 + 1024;
-	if (X > Threshold)       CurButtons |= OPENDINGUX_ANALOG_RIGHT;
-	else if (X < -Threshold) CurButtons |= OPENDINGUX_ANALOG_LEFT;
-	if (Y > Threshold)       CurButtons |= OPENDINGUX_ANALOG_DOWN;
-	else if (Y < -Threshold) CurButtons |= OPENDINGUX_ANALOG_UP;
+	int16_t Threshold = (4 - ResolveSetting(AnalogSensitivity, PerGameAnalogSensitivity)) * 7808 + 1024;
+	int16_t x, y;
+
+	// get left analog input
+	CurButtons &= ~(OPENDINGUX_L_ANALOG_LEFT | OPENDINGUX_L_ANALOG_RIGHT
+                | OPENDINGUX_L_ANALOG_UP   | OPENDINGUX_L_ANALOG_DOWN);
+	x = GetLeftHorizontalAxisValue(), y = GetLeftVerticalAxisValue();
+	if (x > Threshold)       CurButtons |= OPENDINGUX_L_ANALOG_RIGHT;
+	else if (x < -Threshold) CurButtons |= OPENDINGUX_L_ANALOG_LEFT;
+	if (y > Threshold)       CurButtons |= OPENDINGUX_L_ANALOG_DOWN;
+	else if (y < -Threshold) CurButtons |= OPENDINGUX_L_ANALOG_UP;
+
+#ifdef RG350
+	// get right analog input
+	CurButtons &= ~(OPENDINGUX_R_ANALOG_LEFT | OPENDINGUX_R_ANALOG_RIGHT
+                | OPENDINGUX_R_ANALOG_UP   | OPENDINGUX_R_ANALOG_DOWN);
+	x = GetRightHorizontalAxisValue(), y = GetRightVerticalAxisValue();
+	if (x > Threshold)       CurButtons |= OPENDINGUX_R_ANALOG_RIGHT;
+	else if (x < -Threshold) CurButtons |= OPENDINGUX_R_ANALOG_LEFT;
+	if (y > Threshold)       CurButtons |= OPENDINGUX_R_ANALOG_DOWN;
+	else if (y < -Threshold) CurButtons |= OPENDINGUX_R_ANALOG_UP;
+#endif
 }
 
 static bool IsFastForwardToggled = false;
@@ -302,10 +322,10 @@ enum ReGBA_Buttons ReGBA_GetPressedButtons()
 	}
 	if (ResolveSetting(AnalogAction, PerGameAnalogAction) == 1)
 	{
-		if (LastButtons & OPENDINGUX_ANALOG_LEFT)  Result |= REGBA_BUTTON_LEFT;
-		if (LastButtons & OPENDINGUX_ANALOG_RIGHT) Result |= REGBA_BUTTON_RIGHT;
-		if (LastButtons & OPENDINGUX_ANALOG_UP)    Result |= REGBA_BUTTON_UP;
-		if (LastButtons & OPENDINGUX_ANALOG_DOWN)  Result |= REGBA_BUTTON_DOWN;
+		if (LastButtons & OPENDINGUX_L_ANALOG_LEFT)  Result |= REGBA_BUTTON_LEFT;
+		if (LastButtons & OPENDINGUX_L_ANALOG_RIGHT) Result |= REGBA_BUTTON_RIGHT;
+		if (LastButtons & OPENDINGUX_L_ANALOG_UP)    Result |= REGBA_BUTTON_UP;
+		if (LastButtons & OPENDINGUX_L_ANALOG_DOWN)  Result |= REGBA_BUTTON_DOWN;
 	}
 
 	if ((Result & REGBA_BUTTON_LEFT) && (Result & REGBA_BUTTON_RIGHT))
@@ -337,12 +357,12 @@ bool IsImpossibleHotkey(enum OpenDingux_Buttons Hotkey)
 	if ((Hotkey & (OPENDINGUX_BUTTON_UP | OPENDINGUX_BUTTON_DOWN)) == (OPENDINGUX_BUTTON_UP | OPENDINGUX_BUTTON_DOWN))
 		return true;
 #if defined DINGOO_A320
-	if (Hotkey & (OPENDINGUX_ANALOG_LEFT | OPENDINGUX_ANALOG_RIGHT | OPENDINGUX_ANALOG_UP | OPENDINGUX_ANALOG_DOWN))
+	if (Hotkey & (OPENDINGUX_L_ANALOG_LEFT | OPENDINGUX_L_ANALOG_RIGHT | OPENDINGUX_L_ANALOG_UP | OPENDINGUX_L_ANALOG_DOWN))
 		return true;
 #elif defined GCW_ZERO
-	if ((Hotkey & (OPENDINGUX_ANALOG_LEFT | OPENDINGUX_ANALOG_RIGHT)) == (OPENDINGUX_ANALOG_LEFT | OPENDINGUX_ANALOG_RIGHT))
+	if ((Hotkey & (OPENDINGUX_L_ANALOG_LEFT | OPENDINGUX_L_ANALOG_RIGHT)) == (OPENDINGUX_L_ANALOG_LEFT | OPENDINGUX_L_ANALOG_RIGHT))
 		return true;
-	if ((Hotkey & (OPENDINGUX_ANALOG_UP | OPENDINGUX_ANALOG_DOWN)) == (OPENDINGUX_ANALOG_UP | OPENDINGUX_ANALOG_DOWN))
+	if ((Hotkey & (OPENDINGUX_L_ANALOG_UP | OPENDINGUX_L_ANALOG_DOWN)) == (OPENDINGUX_L_ANALOG_UP | OPENDINGUX_L_ANALOG_DOWN))
 		return true;
 #endif
 	return false;
@@ -371,17 +391,16 @@ static void EnsureJoystick()
 	}
 }
 
-int16_t GetHorizontalAxisValue()
+int16_t GetAxis(int axis)
 {
 	EnsureJoystick();
-	return (Joystick != NULL) ? SDL_JoystickGetAxis(Joystick, 0) : 0;
+	return (Joystick != NULL) ? SDL_JoystickGetAxis(Joystick, axis) : 0;
 }
 
-int16_t GetVerticalAxisValue()
-{
-	EnsureJoystick();
-	return (Joystick != NULL) ? SDL_JoystickGetAxis(Joystick, 1) : 0;
-}
+int16_t GetLeftHorizontalAxisValue()  { return GetAxis(0); }
+int16_t GetLeftVerticalAxisValue()    { return GetAxis(1); }
+int16_t GetRightHorizontalAxisValue() { return GetAxis(2); }
+int16_t GetRightVerticalAxisValue()   { return GetAxis(3); }
 
 enum GUI_ActionRepeatState
 {

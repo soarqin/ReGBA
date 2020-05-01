@@ -48,8 +48,8 @@ En el Menú Principal o cualquier submenú que contenga opciones, se puede pulsa
 - Ajustes de entrada (Input Settings) -
 > GBA buttons: Presione A en uno de ellos para establecer un nuevo botón en el dispositivo para ser utilizado en la GBA. Estas asignaciones son obligatorias, no se puede tener una asignación tal que no haya ningun botón asignado. Sin embargo, se puede configurar un solo boton que active múltiples botones en la GBA.
 > Rapid-fire buttons: Estas asignaciones son opcionales, se pueden pulsar A, y luego dos botones a la vez para eliminarlas. Los botones de disparo rápido (Turbo) pulsan y sueltan el botón de GBA a 30 Hz: son presionados durante 1/60 de segundo, entonces se sueltan durante el mismo tiempo.
-> Analog sensitivity (Sólo GCW Zero): Este ajuste controla cuanto tiene que moverse el stick analógico para activar una dirección. El stick analógico se puede utilizar para navegar por los menús con esta sensibilidad también.
-> Analog in-game binding (Sólo GCW Zero): "None" no permite controlar el juego de GBA con el stick analógico, pero permite que sea utilizado para teclas de acceso rápido. "GBA D-pad" permite controlar el juego de GBA con el stick analógico de acuerdo con el ajuste de la sensibilidad, así como teclas de acceso rápido.
+> Analogs sensitivity (Sólo GCW Zero): Este ajuste controla cuanto tiene que moverse el stick analógico para activar una dirección. El stick analógico se puede utilizar para navegar por los menús con esta sensibilidad también.
+> L-Analog in-game binding (Sólo GCW Zero): "None" no permite controlar el juego de GBA con el stick analógico, pero permite que sea utilizado para teclas de acceso rápido. "GBA D-pad" permite controlar el juego de GBA con el stick analógico de acuerdo con el ajuste de la sensibilidad, así como teclas de acceso rápido.
 
 - Teclas de Acceso Rápido (Hotkeys) -
 Presione A en ellos, y se puede establecer una nueva combinación de botones en el dispositivo para activar cada función durante la emulación, o B para borrar la asignación.

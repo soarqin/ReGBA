@@ -20,29 +20,35 @@
 #ifndef __OD_INPUT_H__
 #define __OD_INPUT_H__
 
-#define OPENDINGUX_BUTTON_COUNT 19
+#define OPENDINGUX_BUTTON_COUNT 25
 
 // These must be in the order defined in OpenDinguxKeys in od-input.c.
 enum OpenDingux_Buttons {
-	OPENDINGUX_BUTTON_L          = 0x00001,
-	OPENDINGUX_BUTTON_R          = 0x00002,
-	OPENDINGUX_BUTTON_DOWN       = 0x00004,
-	OPENDINGUX_BUTTON_UP         = 0x00008,
-	OPENDINGUX_BUTTON_LEFT       = 0x00010,
-	OPENDINGUX_BUTTON_RIGHT      = 0x00020,
-	OPENDINGUX_BUTTON_START      = 0x00040,
-	OPENDINGUX_BUTTON_SELECT     = 0x00080,
-	OPENDINGUX_BUTTON_FACE_DOWN  = 0x00100,
-	OPENDINGUX_BUTTON_FACE_RIGHT = 0x00200,
-	OPENDINGUX_BUTTON_FACE_LEFT  = 0x00400,
-	OPENDINGUX_BUTTON_FACE_UP    = 0x00800,
-	OPENDINGUX_ANALOG_DOWN       = 0x01000,
-	OPENDINGUX_ANALOG_UP         = 0x02000,
-	OPENDINGUX_ANALOG_LEFT       = 0x04000,
-	OPENDINGUX_ANALOG_RIGHT      = 0x08000,
-	OPENDINGUX_BUTTON_L2         = 0x10000,
-	OPENDINGUX_BUTTON_R2         = 0x20000,
-	OPENDINGUX_BUTTON_MENU       = 0x40000,
+	OPENDINGUX_BUTTON_L          = 1 << 0,
+	OPENDINGUX_BUTTON_R          = 1 << 1,
+	OPENDINGUX_BUTTON_DOWN       = 1 << 2,
+	OPENDINGUX_BUTTON_UP         = 1 << 3,
+	OPENDINGUX_BUTTON_LEFT       = 1 << 4,
+	OPENDINGUX_BUTTON_RIGHT      = 1 << 5,
+	OPENDINGUX_BUTTON_START      = 1 << 6,
+	OPENDINGUX_BUTTON_SELECT     = 1 << 7,
+	OPENDINGUX_BUTTON_FACE_DOWN  = 1 << 8,
+	OPENDINGUX_BUTTON_FACE_RIGHT = 1 << 9,
+	OPENDINGUX_BUTTON_FACE_LEFT  = 1 << 10,
+	OPENDINGUX_BUTTON_FACE_UP    = 1 << 11,
+	OPENDINGUX_BUTTON_L2         = 1 << 12,
+	OPENDINGUX_BUTTON_R2         = 1 << 13,
+	OPENDINGUX_BUTTON_L3         = 1 << 14,
+	OPENDINGUX_BUTTON_R3         = 1 << 15,
+	OPENDINGUX_BUTTON_MENU       = 1 << 16,
+	OPENDINGUX_L_ANALOG_DOWN     = 1 << 17,
+	OPENDINGUX_L_ANALOG_UP       = 1 << 18,
+	OPENDINGUX_L_ANALOG_LEFT     = 1 << 19,
+	OPENDINGUX_L_ANALOG_RIGHT    = 1 << 20,
+	OPENDINGUX_R_ANALOG_DOWN     = 1 << 21,
+	OPENDINGUX_R_ANALOG_UP       = 1 << 22,
+	OPENDINGUX_R_ANALOG_LEFT     = 1 << 23,
+	OPENDINGUX_R_ANALOG_RIGHT    = 1 << 24,
 };
 
 enum GUI_Action {
@@ -88,18 +94,32 @@ extern uint32_t AnalogAction;
 extern uint_fast8_t FastForwardFrameskipControl;
 
 /*
- * Gets the current value of the analog horizontal axis.
+ * Gets the current value of the left analog horizontal axis.
  * Returns:
  *   A value between -32768 (left) and 32767 (right).
  */
-extern int16_t GetHorizontalAxisValue();
+extern int16_t GetLeftHorizontalAxisValue();
 
 /*
- * Gets the current value of the analog vertical axis.
+ * Gets the current value of the left analog vertical axis.
  * Returns:
  *   A value between -32768 (up) and 32767 (down).
  */
-extern int16_t GetVerticalAxisValue();
+extern int16_t GetLeftVerticalAxisValue();
+
+/*
+ * Gets the current value of the right analog horizontal axis.
+ * Returns:
+ *   A value between -32768 (left) and 32767 (right).
+ */
+extern int16_t GetRightHorizontalAxisValue();
+
+/*
+ * Gets the current value of the right analog vertical axis.
+ * Returns:
+ *   A value between -32768 (up) and 32767 (down).
+ */
+extern int16_t GetRightVerticalAxisValue();
 
 /*
  * Reads the buttons pressed at the time of the function call on the input

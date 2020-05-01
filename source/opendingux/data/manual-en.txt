@@ -48,8 +48,8 @@ In the Main Menu or any submenu containing options, you can press the Select key
 - Input Settings -
 > GBA buttons: Press A on one of these, and you can set a new button on your device to be used for triggering it on the GBA. These mappings are mandatory; you cannot have a mapping such that nothing on your device can trigger a GBA button. However, you can set multiple GBA buttons to be triggered by one on your device.
 > Rapid-fire buttons: These mappings are optional; you can press A, then two buttons at once to clear them. Rapid-fire buttons press and release their GBA button at 30 Hz: they are pressed for 1/60 of a second, then unpressed for the same time.
-> Analog sensitivity (GCW Zero only): This setting controls how far the analog nub needs to go to trigger a direction. The analog nub can be used to navigate the menus with this sensitivity as well.
-> Analog in-game binding (GCW Zero only): "None" does not allow the analog nub to be passed through to the GBA game, but allows it to be used for hotkeys. "GBA D-pad" allows the analog nub to be passed to the GBA according to the sensitivity setting, as well as hotkeys.
+> Analogs sensitivity (GCW Zero only): This setting controls how far the analog nub needs to go to trigger a direction. The analog nub can be used to navigate the menus with this sensitivity as well.
+> L-Analog in-game binding (GCW Zero only): "None" does not allow the analog nub to be passed through to the GBA game, but allows it to be used for hotkeys. "GBA D-pad" allows the analog nub to be passed to the GBA according to the sensitivity setting, as well as hotkeys.
 
 - Hotkeys -
 Press A on these, and you can set a new combination of buttons on your device to be used during emulation to trigger each function, or B to clear the binding.
