@@ -406,22 +406,22 @@ static void SavedStateMenuEnd(struct Menu* ActiveMenu)
 // -- Custom display --
 
 static char* OpenDinguxButtonText[OPENDINGUX_BUTTON_COUNT] = {
+	TOP_FACE_BUTTON_NAME,   // (GCW Y, A320 or RG350 X)
+	"A",
+	"B",
+	LEFT_FACE_BUTTON_NAME,  // (GCW X, A320 or RG350 Y)
 	"L",
 	"R",
-	"D-pad Down",
-	"D-pad Up",
-	"D-pad Left",
-	"D-pad Right",
-	"Start",
-	"Select",
-	"B",
-	"A",
-	LEFT_FACE_BUTTON_NAME,  // (GCW X, A320 or RG350 Y)
-	TOP_FACE_BUTTON_NAME,   // (GCW Y, A320 or RG350 X)
 	"L2",
 	"R2",
+	"Select",
+	"Start",
 	"L3",
 	"R3",
+	"D-pad Up",
+	"D-pad Right",
+	"D-pad Down",
+	"D-pad Left",
 	"POWER",
 	"L-Analog Down",
 	"L-Analog Up",
@@ -582,22 +582,22 @@ static void SavedStateUpdatePreview(struct Menu* ActiveMenu)
 // -- Custom saving --
 
 static char OpenDinguxButtonSave[OPENDINGUX_BUTTON_COUNT] = {
+	'X', // Using the SNES/DS/A320 mapping, this is the upper face button.
+	'A',
+	'B',
+	'Y', // Using the SNES/DS/A320 mapping, this is the left face button.
 	'L',
 	'R',
-	'v', // D-pad directions.
-	'^',
-	'<',
-	'>', // (end)
-	'S', // Start
-	's', // Select
-	'B',
-	'A',
-	'Y', // Using the SNES/DS/A320 mapping, this is the left face button.
-	'X', // Using the SNES/DS/A320 mapping, this is the upper face button.
 	'+', // L2
 	'-', // R2
+	's', // Select
+	'S', // Start
 	'1', // L3
 	'2', // R3
+	'^', // D-pad directions.
+	'>',
+	'v',
+	'<', // (end)
 	'M', // Menu/Power
 	'd', // L-analog down
 	'u', // L-analog up

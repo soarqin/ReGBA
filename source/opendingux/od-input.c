@@ -32,43 +32,48 @@ uint32_t AnalogAction = 0;
 
 uint_fast8_t FastForwardFrameskipControl = 0;
 
-// used for the analog sticks
-static SDL_Joystick* Joystick;
-static bool JoystickInitialised = false;
+// 0 for native analog sticks, 1 for extra joystick (USB)
+static SDL_Joystick *Joysticks[2];
+static bool JoysticksInitialised[2] = {false, false};
 
 // Mandatory remapping for OpenmDingux keys. Each OpenmDingux key maps to a
 // key on the keyboard, but not all keys on the keyboard map to these.
 // They are not in GBA bitfield order in this array.
 uint32_t OpenDinguxKeys[OPENDINGUX_BUTTON_COUNT] = {
+	SDLK_SPACE,      // Upper face button (GCW Y, A320/RG350 X)
+	SDLK_LCTRL,      // Right face button (A)
+	SDLK_LALT,       // Lower face button (B)
+	SDLK_LSHIFT,     // Left  face button (GCW X, A320/RG350 Y)
 	SDLK_TAB,        // L
 	SDLK_BACKSPACE,  // R
-	SDLK_DOWN,       // Down
-	SDLK_UP,         // Up
-	SDLK_LEFT,       // Left
-	SDLK_RIGHT,      // Right
-	SDLK_RETURN,     // Start
-	SDLK_ESCAPE,     // Select
-	SDLK_LALT,       // Lower face button (B)
-	SDLK_LCTRL,      // Right face button (A)
-	SDLK_LSHIFT,     // Left face button (GCW X, A320/RG350 Y)
-	SDLK_SPACE,      // Upper face button (GCW Y, A320/RG350 X)
 #ifdef RG350
 	SDLK_PAGEUP,     // RG350: L2
 	SDLK_PAGEDOWN,   // RG350: R2
-	SDLK_KP_DIVIDE,  // RG350: L3
-	SDLK_KP_PERIOD,  // RG350: R3
-	SDLK_HOME,       // RG350: Quick flick of Power
 #elif defined PLAYGO
 	SDLK_RSHIFT,     // PLAYGO: L2
 	SDLK_RALT,       // PLAYGO: R2
-	0,               // no L3
-	0,               // no R3
-	SDLK_RCTRL,      // PLAYGO: Menu face button
 #else
 	0,               // no L2
 	0,               // no R2
+#endif
+	SDLK_ESCAPE,     // Select
+	SDLK_RETURN,     // Start
+#ifdef RG350
+	SDLK_KP_DIVIDE,  // RG350: L3
+	SDLK_KP_PERIOD,  // RG350: R3
+#else
 	0,               // no L3
 	0,               // no R3
+#endif
+	SDLK_UP,         // Up
+	SDLK_RIGHT,      // Right
+	SDLK_DOWN,       // Down
+	SDLK_LEFT,       // Left
+#ifdef RG350
+	SDLK_HOME,       // RG350: Quick flick of Power
+#elif defined PLAYGO
+	SDLK_RCTRL,      // PLAYGO: Menu face button
+#else
 	SDLK_3,          // GCW: Quick flick of Power
 #endif
 	0,               // Left analog down
@@ -174,6 +179,44 @@ enum GUI_Action MenuKeysToGUI[7] = {
 // FutureButtons alows any number of state changes per button.
 static enum OpenDingux_Buttons LastButtons = 0, CurButtons = 0, FutureButtons = 0;
 
+// but_index is the index of the pressed button in the OpenDinguxKeys array
+static void ButtonPress(uint_fast8_t but_index)
+{
+	FutureButtons |= 1 << but_index;
+	if ((LastButtons & (1 << but_index)) == (CurButtons & (1 << but_index)))
+		CurButtons |= 1 << but_index;
+}
+
+// but_index is the index of the release button in the OpenDinguxKeys array
+static void ButtonRelease(uint_fast8_t but_index)
+{
+	FutureButtons &= ~(1 << but_index);
+	if ((LastButtons & (1 << but_index)) == (CurButtons & (1 << but_index)))
+		CurButtons &= ~(1 << but_index);
+}
+
+static void ReadLeftStick(uint_fast8_t js)
+{
+	int16_t Threshold = (4 - ResolveSetting(AnalogSensitivity, PerGameAnalogSensitivity)) * 7808 + 1024;
+	int16_t x, y;
+	x = GetAxis(js, JS_AXIS_LEFT_HORIZONTAL), y = GetAxis(js, JS_AXIS_LEFT_VERTICAL);
+	if (x > Threshold)       CurButtons |= OPENDINGUX_L_ANALOG_RIGHT;
+	else if (x < -Threshold) CurButtons |= OPENDINGUX_L_ANALOG_LEFT;
+	if (y > Threshold)       CurButtons |= OPENDINGUX_L_ANALOG_DOWN;
+	else if (y < -Threshold) CurButtons |= OPENDINGUX_L_ANALOG_UP;
+}
+
+static void ReadRightStick(uint_fast8_t js)
+{
+	int16_t Threshold = (4 - ResolveSetting(AnalogSensitivity, PerGameAnalogSensitivity)) * 7808 + 1024;
+	int16_t x, y;
+	x = GetAxis(js, JS_AXIS_RIGHT_HORIZONTAL), y = GetAxis(js, JS_AXIS_RIGHT_VERTICAL);
+	if (x > Threshold)       CurButtons |= OPENDINGUX_R_ANALOG_RIGHT;
+	else if (x < -Threshold) CurButtons |= OPENDINGUX_R_ANALOG_LEFT;
+	if (y > Threshold)       CurButtons |= OPENDINGUX_R_ANALOG_DOWN;
+	else if (y < -Threshold) CurButtons |= OPENDINGUX_R_ANALOG_UP;
+}
+
 static void UpdateOpenDinguxButtons()
 {
 	SDL_Event ev;
@@ -183,13 +226,12 @@ static void UpdateOpenDinguxButtons()
 	{
 		switch (ev.type)
 		{
+			// -- handling native buttons --
 			case SDL_KEYDOWN:
 				for (i = 0; i < sizeof(OpenDinguxKeys) / sizeof(OpenDinguxKeys[0]); i++)
 					if (ev.key.keysym.sym == OpenDinguxKeys[i])
 					{
-						FutureButtons |= 1 << i;
-						if ((LastButtons & (1 << i)) == (CurButtons & (1 << i)))
-							CurButtons |= 1 << i;
+						ButtonPress(i);
 						break;
 					}
 				break;
@@ -197,39 +239,53 @@ static void UpdateOpenDinguxButtons()
 				for (i = 0; i < sizeof(OpenDinguxKeys) / sizeof(OpenDinguxKeys[0]); i++)
 					if (ev.key.keysym.sym == OpenDinguxKeys[i])
 					{
-						FutureButtons &= ~(1 << i);
-						if ((LastButtons & (1 << i)) == (CurButtons & (1 << i)))
-							CurButtons &= ~(1 << i);
+						ButtonRelease(i);
 						break;
 					}
 				break;
+
+			// -- handling USB joystick buttons --
+			case SDL_JOYBUTTONDOWN:
+				ButtonPress(ev.jbutton.button);
+				break;
+			case SDL_JOYBUTTONUP:
+				ButtonRelease(ev.jbutton.button);
+				break;
+
+			// -- handling USB joystick D-pad (HAT) --
+			case SDL_JOYHATMOTION:
+				// reset hat
+				ButtonRelease(OPENDINGUX_BUTTON_INDEX_UP);
+				ButtonRelease(OPENDINGUX_BUTTON_INDEX_RIGHT);
+				ButtonRelease(OPENDINGUX_BUTTON_INDEX_DOWN);
+				ButtonRelease(OPENDINGUX_BUTTON_INDEX_LEFT);
+				// get pressed direction(s)
+				if (ev.jhat.value & SDL_HAT_UP)    ButtonPress(OPENDINGUX_BUTTON_INDEX_UP);
+				if (ev.jhat.value & SDL_HAT_RIGHT) ButtonPress(OPENDINGUX_BUTTON_INDEX_RIGHT);
+				if (ev.jhat.value & SDL_HAT_DOWN)  ButtonPress(OPENDINGUX_BUTTON_INDEX_DOWN);
+				if (ev.jhat.value & SDL_HAT_LEFT)  ButtonPress(OPENDINGUX_BUTTON_INDEX_LEFT);
+				break;
+
 			default:
 				break;
 		}
 	}
 
-	int16_t Threshold = (4 - ResolveSetting(AnalogSensitivity, PerGameAnalogSensitivity)) * 7808 + 1024;
-	int16_t x, y;
+	// -- handling analog sticks --
 
-	// get left analog input
+	// clean left and right analog bits
 	CurButtons &= ~(OPENDINGUX_L_ANALOG_LEFT | OPENDINGUX_L_ANALOG_RIGHT
                 | OPENDINGUX_L_ANALOG_UP   | OPENDINGUX_L_ANALOG_DOWN);
-	x = GetLeftHorizontalAxisValue(), y = GetLeftVerticalAxisValue();
-	if (x > Threshold)       CurButtons |= OPENDINGUX_L_ANALOG_RIGHT;
-	else if (x < -Threshold) CurButtons |= OPENDINGUX_L_ANALOG_LEFT;
-	if (y > Threshold)       CurButtons |= OPENDINGUX_L_ANALOG_DOWN;
-	else if (y < -Threshold) CurButtons |= OPENDINGUX_L_ANALOG_UP;
-
-#ifdef RG350
-	// get right analog input
 	CurButtons &= ~(OPENDINGUX_R_ANALOG_LEFT | OPENDINGUX_R_ANALOG_RIGHT
                 | OPENDINGUX_R_ANALOG_UP   | OPENDINGUX_R_ANALOG_DOWN);
-	x = GetRightHorizontalAxisValue(), y = GetRightVerticalAxisValue();
-	if (x > Threshold)       CurButtons |= OPENDINGUX_R_ANALOG_RIGHT;
-	else if (x < -Threshold) CurButtons |= OPENDINGUX_R_ANALOG_LEFT;
-	if (y > Threshold)       CurButtons |= OPENDINGUX_R_ANALOG_DOWN;
-	else if (y < -Threshold) CurButtons |= OPENDINGUX_R_ANALOG_UP;
-#endif
+
+	// native joystick
+	ReadLeftStick(0);
+	ReadRightStick(0);
+
+	// usb joytick
+	ReadLeftStick(1);
+	ReadRightStick(1);
 }
 
 static bool IsFastForwardToggled = false;
@@ -378,29 +434,24 @@ enum OpenDingux_Buttons GetPressedOpenDinguxButtons()
 	return LastButtons & ~OPENDINGUX_BUTTON_MENU;
 }
 
-static void EnsureJoystick()
+static void EnsureJoystick(uint_fast8_t js)
 {
-	if (!JoystickInitialised)
+	if (!JoysticksInitialised[js])
 	{
-		JoystickInitialised = true;
-		Joystick = SDL_JoystickOpen(0);
-		if (Joystick == NULL)
+		JoysticksInitialised[js] = true;
+		Joysticks[js] = SDL_JoystickOpen(js);
+		if (Joysticks[js] == NULL)
 		{
-			ReGBA_Trace("I: Joystick #0 could not be opened");
+			ReGBA_Trace("I: Joystick could not be opened");
 		}
 	}
 }
 
-int16_t GetAxis(int axis)
+int16_t GetAxis(uint_fast8_t js, enum Joystick_Stick_Axis axis)
 {
-	EnsureJoystick();
-	return (Joystick != NULL) ? SDL_JoystickGetAxis(Joystick, axis) : 0;
+	EnsureJoystick(js);
+	return (Joysticks[js] != NULL) ? SDL_JoystickGetAxis(Joysticks[js], axis) : 0;
 }
-
-int16_t GetLeftHorizontalAxisValue()  { return GetAxis(0); }
-int16_t GetLeftVerticalAxisValue()    { return GetAxis(1); }
-int16_t GetRightHorizontalAxisValue() { return GetAxis(2); }
-int16_t GetRightVerticalAxisValue()   { return GetAxis(3); }
 
 enum GUI_ActionRepeatState
 {
