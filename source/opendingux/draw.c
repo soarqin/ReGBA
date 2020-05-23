@@ -61,7 +61,7 @@ static struct timespec LastProgressUpdate;
 
 void init_video()
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO /*| SDL_INIT_JOYSTICK*/) < 0)
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0)
 	{
 		printf("Failed to initialize SDL !!\n");
 		return;   // for debug
