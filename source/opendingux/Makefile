@@ -28,11 +28,16 @@ DEFS        := -DGCW_ZERO -DMIPS_XBURST                                       \
                -DSCREEN_WIDTH=320 -DSCREEN_HEIGHT=240                         \
                -DGIT_VERSION=$(shell git describe --always)
 
+ifdef PLAYGO
+	DEFS += -DPLAYGO
+	DEFS += -DUSE_MMAP
+else
 ifdef RG350
 	DEFS += -DRG350
 	DEFS += -DUSE_MMAP
 else
 	DEFS += -DLOAD_ALL_ROM
+endif
 endif
 HAS_MIPS32R2 := $(shell echo | $(CC) -dM -E - |grep _MIPS_ARCH_MIPS32R2)
 ifneq ($(HAS_MIPS32R2),)
