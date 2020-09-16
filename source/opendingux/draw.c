@@ -46,6 +46,9 @@ video_scale_type ScaleMode = scaled_aspect;
 uint32_t PerGameColorCorrection = 0;
 uint32_t ColorCorrection = 0;
 
+uint32_t PerGameInterframeBlending = 0;
+uint32_t InterframeBlending = 0;
+
 #define COLOR_PROGRESS_BACKGROUND   RGB888_TO_NATIVE(  0,   0,   0)
 #define COLOR_PROGRESS_TEXT_CONTENT RGB888_TO_NATIVE(255, 255, 255)
 #define COLOR_PROGRESS_TEXT_OUTLINE RGB888_TO_NATIVE(  0,   0,   0)
@@ -62,7 +65,9 @@ uint32_t ColorCorrection = 0;
 static bool InFileAction = false;
 static enum ReGBA_FileAction CurrentFileAction;
 static struct timespec LastProgressUpdate;
-static uint16_t CcOutputBuffer[GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT];
+
+static uint16_t GBAScreenPrev[GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT];
+static uint16_t GBAScreenProcessed[GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT];
 
 void init_video()
 {
@@ -98,8 +103,10 @@ void init_video()
 
 	GBAScreen = (uint16_t*) GBAScreenSurface->pixels;
 
-	/* Set colour correction output buffer to all-white */
-	memset(CcOutputBuffer, 0xFFFF,
+	/* Set auxiliary post-processing buffers to all-white */
+	memset(GBAScreenPrev, 0xFFFF,
+			GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT * sizeof(uint16_t));
+	memset(GBAScreenProcessed, 0xFFFF,
 			GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT * sizeof(uint16_t));
 
 #ifdef NO_SCALING
@@ -186,6 +193,73 @@ bool ApplyBorder(const char* Filename)
 		JustLoaded = NULL;
 	}
 	return Result;
+}
+
+static inline void gba_apply_color_correction(void)
+{
+	uint16_t *src = GBAScreen;
+	uint16_t *dst = GBAScreenProcessed;
+	size_t x, y;
+
+	/* Note: GBAScreen pitch is equal to GBA_SCREEN_WIDTH */
+	for (y = 0; y < GBA_SCREEN_HEIGHT; y++)
+	{
+		for (x = 0; x < GBA_SCREEN_WIDTH; x++)
+		{
+			/* Source array values should be limited to
+			 * the lowest 15 bits - but since the data
+			 * type is 16 bit, we have to mask it in
+			 * order to guarantee that CcLUT can never
+			 * overflow... */
+			*(dst + x) = *(CcLUT + (*(src + x) & 0x7FFF));
+		}
+		src += GBA_SCREEN_WIDTH;
+		dst += GBA_SCREEN_WIDTH;
+	}
+}
+
+static inline void gba_mix_frames(bool color_correction)
+{
+	uint16_t *src_curr = GBAScreen;
+	uint16_t *src_prev = GBAScreenPrev;
+	uint16_t *dst      = GBAScreenProcessed;
+	size_t x, y;
+
+	for (y = 0; y < GBA_SCREEN_HEIGHT; y++)
+	{
+		for (x = 0; x < GBA_SCREEN_WIDTH; x++)
+		{
+			/* Get colours from current + previous frames (BGR555) */
+			uint16_t rgb_curr = *(src_curr + x);
+			uint16_t rgb_prev = *(src_prev + x);
+
+			uint16_t r_curr   = rgb_curr       & 0x1F;
+			uint16_t g_curr   = rgb_curr >>  5 & 0x1F;
+			uint16_t b_curr   = rgb_curr >> 10 & 0x1F;
+
+			uint16_t r_prev   = rgb_prev       & 0x1F;
+			uint16_t g_prev   = rgb_prev >>  5 & 0x1F;
+			uint16_t b_prev   = rgb_prev >> 10 & 0x1F;
+
+			/* Store colours for next frame */
+			*(src_prev + x)   = rgb_curr;
+
+			/* Mix colours */
+			uint16_t r_mix    = (r_curr >> 1) + (r_prev >> 1) + (((r_curr & 0x1) + (r_prev & 0x1)) >> 1);
+			uint16_t g_mix    = (g_curr >> 1) + (g_prev >> 1) + (((g_curr & 0x1) + (g_prev & 0x1)) >> 1);
+			uint16_t b_mix    = (b_curr >> 1) + (b_prev >> 1) + (((b_curr & 0x1) + (b_prev & 0x1)) >> 1);
+
+			/* Convert back to BGR555 */
+			uint16_t rgb_mix  = b_mix << 10 | g_mix << 5 | r_mix;
+
+			/* Assign colours for current frame */
+			*(dst + x)        = color_correction ?
+					*(CcLUT + rgb_mix) : rgb_mix;
+		}
+		src_curr += GBA_SCREEN_WIDTH;
+		src_prev += GBA_SCREEN_WIDTH;
+		dst      += GBA_SCREEN_WIDTH;
+	}
 }
 
 /***************************************************************************
@@ -1608,31 +1682,22 @@ void ReGBA_RenderScreen(void)
 		Stats.TotalRenderedFrames++;
 		Stats.RenderedFrames++;
 
-		/* Perform colour correction, if required */
-		uint32_t ResolvedColorCorrection = ResolveSetting(ColorCorrection, PerGameColorCorrection);
-		if (ResolvedColorCorrection)
+		/* Perform colour correction/frame mixing,
+		 * if required */
+		uint32_t ResolvedColorCorrection    = ResolveSetting(
+				ColorCorrection, PerGameColorCorrection);
+		uint32_t ResolvedInterframeBlending = ResolveSetting(
+				InterframeBlending, PerGameInterframeBlending);
+
+		if (ResolvedInterframeBlending)
 		{
-			uint16_t *src = GBAScreen;
-			uint16_t *dst = CcOutputBuffer;
-			size_t x, y;
-
-			/* Note: GBAScreen pitch is equal to GBA_SCREEN_WIDTH */
-			for (y = 0; y < GBA_SCREEN_HEIGHT; y++)
-			{
-				for (x = 0; x < GBA_SCREEN_WIDTH; x++)
-				{
-					/* Source array values should be limited to
-					 * the lowest 15 bits - but since the data
-					 * type is 16 bit, we have to mask it in
-					 * order to guarantee that CcLUT can never
-					 * overflow... */
-					*(dst + x) = *(CcLUT + (*(src + x) & 0x7FFF));
-				}
-				src += GBA_SCREEN_WIDTH;
-				dst += GBA_SCREEN_WIDTH;
-			}
-
-			GBAScreenBuf = CcOutputBuffer;
+			gba_mix_frames((bool)ResolvedColorCorrection);
+			GBAScreenBuf = GBAScreenProcessed;
+		}
+		else if (ResolvedColorCorrection)
+		{
+			gba_apply_color_correction();
+			GBAScreenBuf = GBAScreenProcessed;
 		}
 
 		video_scale_type ResolvedScaleMode = ResolveSetting(ScaleMode, PerGameScaleMode);

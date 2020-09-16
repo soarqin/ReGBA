@@ -49,6 +49,9 @@ extern video_scale_type ScaleMode;
 extern uint32_t PerGameColorCorrection;
 extern uint32_t ColorCorrection;
 
+extern uint32_t PerGameInterframeBlending;
+extern uint32_t InterframeBlending;
+
 void init_video();
 extern bool ApplyBorder(const char* Filename);
 
