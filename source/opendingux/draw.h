@@ -46,6 +46,9 @@ enum VerticalAlignment {
 extern video_scale_type PerGameScaleMode;
 extern video_scale_type ScaleMode;
 
+extern uint32_t PerGameColorCorrection;
+extern uint32_t ColorCorrection;
+
 void init_video();
 extern bool ApplyBorder(const char* Filename);
 

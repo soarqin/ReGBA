@@ -1189,6 +1189,15 @@ static struct MenuEntry DisplayMenu_ScaleMode = {
 };
 #endif
 
+static struct MenuEntry PerGameDisplayMenu_ColorCorrection = {
+	ENTRY_OPTION("color_correction", "Color Correction", &PerGameColorCorrection),
+	.ChoiceCount = 3, .Choices = { { "No override", "" }, { "Off", "off" }, { "On", "on" } }
+};
+static struct MenuEntry DisplayMenu_ColorCorrection = {
+	ENTRY_OPTION("color_correction", "Color Correction", &ColorCorrection),
+	.ChoiceCount = 2, .Choices = { { "Off", "off" }, { "On", "on" } }
+};
+
 static struct MenuEntry PerGameDisplayMenu_Frameskip = {
 	ENTRY_OPTION("frameskip", "Frame skipping", &PerGameUserFrameskip),
 	.ChoiceCount = 6, .Choices = { { "No override", "" }, { "Automatic", "auto" }, { "0 (~60 FPS)", "0" }, { "1 (~30 FPS)", "1" }, { "2 (~20 FPS)", "2" }, { "3 (~15 FPS)", "3" } }
@@ -1215,8 +1224,10 @@ static struct Menu PerGameDisplayMenu = {
 #ifndef NO_SCALING
 		&PerGameDisplayMenu_ScaleMode,
 #endif
+		&PerGameDisplayMenu_ColorCorrection,
 		&PerGameDisplayMenu_Frameskip, &PerGameDisplayMenu_FastForwardTarget, NULL }
 };
+
 static struct Menu DisplayMenu = {
 	.Parent = &MainMenu, .Title = "Display settings",
 	.AlternateVersion = &PerGameDisplayMenu,
@@ -1224,6 +1235,7 @@ static struct Menu DisplayMenu = {
 #ifndef NO_SCALING
 		&DisplayMenu_ScaleMode,
 #endif
+		&DisplayMenu_ColorCorrection,
 		&DisplayMenu_Frameskip, &DisplayMenu_FastForwardTarget, NULL }
 };
 

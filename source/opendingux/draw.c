@@ -18,6 +18,7 @@
  */
 
 #include "common.h"
+#include "cc_lut.h"
 
 struct StringCut {
 	uint32_t Start;  // Starting character index of the cut, inclusive.
@@ -42,6 +43,9 @@ SDL_Surface *BorderSurface = NULL;
 video_scale_type PerGameScaleMode = 0;
 video_scale_type ScaleMode = scaled_aspect;
 
+uint32_t PerGameColorCorrection = 0;
+uint32_t ColorCorrection = 0;
+
 #define COLOR_PROGRESS_BACKGROUND   RGB888_TO_NATIVE(  0,   0,   0)
 #define COLOR_PROGRESS_TEXT_CONTENT RGB888_TO_NATIVE(255, 255, 255)
 #define COLOR_PROGRESS_TEXT_OUTLINE RGB888_TO_NATIVE(  0,   0,   0)
@@ -58,6 +62,7 @@ video_scale_type ScaleMode = scaled_aspect;
 static bool InFileAction = false;
 static enum ReGBA_FileAction CurrentFileAction;
 static struct timespec LastProgressUpdate;
+static uint16_t CcOutputBuffer[GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT];
 
 void init_video()
 {
@@ -92,6 +97,10 @@ void init_video()
 	  0 /* alpha: none */);
 
 	GBAScreen = (uint16_t*) GBAScreenSurface->pixels;
+
+	/* Set colour correction output buffer to all-white */
+	memset(CcOutputBuffer, 0xFFFF,
+			GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT * sizeof(uint16_t));
 
 #ifdef NO_SCALING
 	ScaleMode = unscaled;
@@ -1594,8 +1603,38 @@ void ReGBA_RenderScreen(void)
 {
 	if (ReGBA_IsRenderingNextFrame())
 	{
+		uint16_t *GBAScreenBuf = GBAScreen;
+
 		Stats.TotalRenderedFrames++;
 		Stats.RenderedFrames++;
+
+		/* Perform colour correction, if required */
+		uint32_t ResolvedColorCorrection = ResolveSetting(ColorCorrection, PerGameColorCorrection);
+		if (ResolvedColorCorrection)
+		{
+			uint16_t *src = GBAScreen;
+			uint16_t *dst = CcOutputBuffer;
+			size_t x, y;
+
+			/* Note: GBAScreen pitch is equal to GBA_SCREEN_WIDTH */
+			for (y = 0; y < GBA_SCREEN_HEIGHT; y++)
+			{
+				for (x = 0; x < GBA_SCREEN_WIDTH; x++)
+				{
+					/* Source array values should be limited to
+					 * the lowest 15 bits - but since the data
+					 * type is 16 bit, we have to mask it in
+					 * order to guarantee that CcLUT can never
+					 * overflow... */
+					*(dst + x) = *(CcLUT + (*(src + x) & 0x7FFF));
+				}
+				src += GBA_SCREEN_WIDTH;
+				dst += GBA_SCREEN_WIDTH;
+			}
+
+			GBAScreenBuf = CcOutputBuffer;
+		}
+
 		video_scale_type ResolvedScaleMode = ResolveSetting(ScaleMode, PerGameScaleMode);
 		if (FramesBordered < 3)
 		{
@@ -1609,49 +1648,51 @@ void ReGBA_RenderScreen(void)
 			                  images, acts as unscaled */
 #endif
 			case unscaled:
-				gba_render_fast(OutputSurface->pixels, GBAScreenSurface->pixels);
+				{
+					uint32_t *GBAScreenBuf32 = (uint32_t *)GBAScreenBuf;
+					gba_render_fast(OutputSurface->pixels, GBAScreenBuf32);
+				}
 				break;
-
 #ifdef NO_SCALING
 			default:
 				break;
 #else /* NO_SCALING */
 			case fullscreen:
-				gba_upscale(OutputSurface->pixels, GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_upscale(OutputSurface->pixels, GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case fullscreen_bilinear:
-				gba_upscale_bilinear(OutputSurface->pixels, GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_upscale_bilinear(OutputSurface->pixels, GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case fullscreen_subpixel:
-				gba_upscale_subpixel(OutputSurface->pixels, GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_upscale_subpixel(OutputSurface->pixels, GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case scaled_aspect:
 				gba_upscale_aspect((uint16_t*) ((uint8_t*)
 					OutputSurface->pixels +
 					(((SCREEN_HEIGHT - (GBA_SCREEN_HEIGHT) * 4 / 3) / 2) * OutputSurface->pitch)) /* center vertically */,
-					GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+					GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case scaled_aspect_bilinear:
 				gba_upscale_aspect_bilinear((uint16_t*) ((uint8_t*)
 					OutputSurface->pixels +
 					(((SCREEN_HEIGHT - (GBA_SCREEN_HEIGHT) * 4 / 3) / 2) * OutputSurface->pitch)) /* center vertically */,
-					GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+					GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case scaled_aspect_subpixel:
 				gba_upscale_aspect_subpixel((uint16_t*) ((uint8_t*)
 					OutputSurface->pixels +
 					(((SCREEN_HEIGHT - (GBA_SCREEN_HEIGHT) * 4 / 3) / 2) * OutputSurface->pitch)) /* center vertically */,
-					GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+					GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 #ifdef GCW_ZERO
 			case hardware:
-				gba_convert(OutputSurface->pixels, GBAScreen, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_convert(OutputSurface->pixels, GBAScreenBuf, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 #endif
 #endif /* NO_SCALING */
