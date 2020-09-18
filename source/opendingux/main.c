@@ -282,7 +282,15 @@ int main(int argc, char *argv[])
 
   // We'll never actually return from here.
 
+  /* Note: SetGameResolution() sometimes produces
+   * the wrong result here, for reasons unknown -
+   * particularly when using the hardware_2x scale
+   * mode. Attempt to work around this with a nasty
+   * kludge... */
+  SetMenuResolution();
   SetGameResolution();
+  if (ResolveSetting(ScaleMode, PerGameScaleMode) == hardware_2x)
+    SetGameResolution();
 
   execute_arm_translate(execute_cycles);
   return 0;
