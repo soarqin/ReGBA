@@ -11,12 +11,13 @@ SDL_LIBS    := $(shell $(SYSROOT)/usr/bin/sdl-config --libs)
 OBJS        := main.o draw.o port.o port-asm.o od-input.o ../video.o          \
               ../input.o ../bios.o ../zip.o ../sound.o ../mips/stub.o         \
               ../stats.o ../memory.o ../cpu_common.o ../cpu_asm.o od-sound.o  \
-              ../sha1.o imageio.o ../unifont.o gui.o od-memory.o settings.o
+              ../sha1.o imageio.o ../unifont.o gui.o od-memory.o settings.o   \
+              cc_lut.o
               
 HEADERS     := cheats.h ../common.h ../cpu_common.h ../cpu.h draw.h main.h    \
                ../input.h ../memory.h message.h ../mips/emit.h ../sound.h     \
                ../stats.h ../video.h ../zip.h port.h od-sound.h ../sha1.h     \
-               imageio.h ../unifont.h od-input.h settings.h
+               imageio.h ../unifont.h od-input.h settings.h cc_lut.h
 
 INCLUDE     := -I. -I.. -I../mips
 OPTIMIZE =  -O2 -mno-mips16 -fomit-frame-pointer -fno-builtin   \
@@ -27,11 +28,16 @@ DEFS        := -DGCW_ZERO -DMIPS_XBURST                                       \
                -DSCREEN_WIDTH=320 -DSCREEN_HEIGHT=240                         \
                -DGIT_VERSION=$(shell git describe --always)
 
+ifdef PLAYGO
+	DEFS += -DPLAYGO
+	DEFS += -DUSE_MMAP
+else
 ifdef RG350
 	DEFS += -DRG350
 	DEFS += -DUSE_MMAP
 else
 	DEFS += -DLOAD_ALL_ROM
+endif
 endif
 HAS_MIPS32R2 := $(shell echo | $(CC) -dM -E - |grep _MIPS_ARCH_MIPS32R2)
 ifneq ($(HAS_MIPS32R2),)

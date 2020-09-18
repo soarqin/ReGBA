@@ -8,3 +8,4 @@
 *.bak
 [Tt]humbs.db
 log
+source/opendingux/tools/generate_cc_lut

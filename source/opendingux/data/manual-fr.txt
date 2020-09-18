@@ -47,8 +47,8 @@ Dans le Menu Principal ou tout sous-menu comportant des options, vous pouvez app
 - Réglages d'entrée (Input Settings) -
 > Boutons GBA: Appuyez sur A sur une de ces options et vous pouvez affecter un nouveau bouton sur votre dispositif à celui de la GBA. Ces affectations sont obligatoires; il est impossible de ne rien affecter à un certain bouton de la GBA. Par contre, vous pouvez affecter le même bouton sur votre dispositif à plusieurs boutons de la GBA.
 > Boutons de tir rapide (Rapid-fire): Ces affectations sont facultatives; vous pouvez appuyer sur A, puis sur deux boutons à la fois pour les effacer. Les boutons de tir rapide pressent et relâchent un bouton à 30 Hz: le bouton est pressé pendant 1/60 de seconde, puis relâché pendant ce même temps.
-> Analog sensitivity (GCW Zero seulement): Cette option contrôle la sensibilité du stick analogique, soit la quantité de mouvement requise dans une direction. Vous pouvez aussi utiliser le stick analogique pour naviguer dans le menu avec cette valeur de sensibilité.
-> Analog in-game binding (GCW Zero seulement): "None" ne permet pas au stick analogique de contrôler le pavé directionnel de la GBA, seulement d'être utilisé pour des raccourcis. "GBA D-pad" permet au stick analogique de déclencher le pavé directionnel de la GBA ainsi que les raccourcis.
+> Analogs sensitivity (GCW Zero seulement): Cette option contrôle la sensibilité du stick analogique, soit la quantité de mouvement requise dans une direction. Vous pouvez aussi utiliser le stick analogique pour naviguer dans le menu avec cette valeur de sensibilité.
+> L-Analog in-game binding (GCW Zero seulement): "None" ne permet pas au stick analogique de contrôler le pavé directionnel de la GBA, seulement d'être utilisé pour des raccourcis. "GBA D-pad" permet au stick analogique de déclencher le pavé directionnel de la GBA ainsi que les raccourcis.
 
 - Raccourcis (Hotkeys) -
 Appuyez sur A sur une de ces options et vous pouvez affecter une nouvelle combinaison de boutons sur votre dispositif pour déclencher chaque fonction, ou bien B pour effacer l'affectation.

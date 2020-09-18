@@ -18,6 +18,7 @@
  */
 
 #include "common.h"
+#include "cc_lut.h"
 
 struct StringCut {
 	uint32_t Start;  // Starting character index of the cut, inclusive.
@@ -42,6 +43,12 @@ SDL_Surface *BorderSurface = NULL;
 video_scale_type PerGameScaleMode = 0;
 video_scale_type ScaleMode = scaled_aspect;
 
+uint32_t PerGameColorCorrection = 0;
+uint32_t ColorCorrection = 0;
+
+uint32_t PerGameInterframeBlending = 0;
+uint32_t InterframeBlending = 0;
+
 #define COLOR_PROGRESS_BACKGROUND   RGB888_TO_NATIVE(  0,   0,   0)
 #define COLOR_PROGRESS_TEXT_CONTENT RGB888_TO_NATIVE(255, 255, 255)
 #define COLOR_PROGRESS_TEXT_OUTLINE RGB888_TO_NATIVE(  0,   0,   0)
@@ -59,9 +66,12 @@ static bool InFileAction = false;
 static enum ReGBA_FileAction CurrentFileAction;
 static struct timespec LastProgressUpdate;
 
+static uint16_t GBAScreenPrev[GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT];
+static uint16_t GBAScreenProcessed[GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT];
+
 void init_video()
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO /*| SDL_INIT_JOYSTICK*/) < 0)
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0)
 	{
 		printf("Failed to initialize SDL !!\n");
 		return;   // for debug
@@ -92,6 +102,12 @@ void init_video()
 	  0 /* alpha: none */);
 
 	GBAScreen = (uint16_t*) GBAScreenSurface->pixels;
+
+	/* Set auxiliary post-processing buffers to all-white */
+	memset(GBAScreenPrev, 0xFFFF,
+			GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT * sizeof(uint16_t));
+	memset(GBAScreenProcessed, 0xFFFF,
+			GBA_SCREEN_WIDTH * GBA_SCREEN_HEIGHT * sizeof(uint16_t));
 
 #ifdef NO_SCALING
 	ScaleMode = unscaled;
@@ -124,7 +140,12 @@ void SetGameResolution()
 #ifdef GCW_ZERO
 	video_scale_type ResolvedScaleMode = ResolveSetting(ScaleMode, PerGameScaleMode);
 	unsigned int Width = GBA_SCREEN_WIDTH, Height = GBA_SCREEN_HEIGHT;
-	if (ResolvedScaleMode != hardware)
+	if (ResolvedScaleMode == hardware_2x)
+	{
+		Width = GBA_SCREEN_WIDTH << 1;
+		Height = GBA_SCREEN_HEIGHT << 1;
+	}
+	else if (ResolvedScaleMode != hardware)
 	{
 		Width = SCREEN_WIDTH;
 		Height = SCREEN_HEIGHT;
@@ -177,6 +198,73 @@ bool ApplyBorder(const char* Filename)
 		JustLoaded = NULL;
 	}
 	return Result;
+}
+
+static inline void gba_apply_color_correction(void)
+{
+	uint16_t *src = GBAScreen;
+	uint16_t *dst = GBAScreenProcessed;
+	size_t x, y;
+
+	/* Note: GBAScreen pitch is equal to GBA_SCREEN_WIDTH */
+	for (y = 0; y < GBA_SCREEN_HEIGHT; y++)
+	{
+		for (x = 0; x < GBA_SCREEN_WIDTH; x++)
+		{
+			/* Source array values should be limited to
+			 * the lowest 15 bits - but since the data
+			 * type is 16 bit, we have to mask it in
+			 * order to guarantee that CcLUT can never
+			 * overflow... */
+			*(dst + x) = *(CcLUT + (*(src + x) & 0x7FFF));
+		}
+		src += GBA_SCREEN_WIDTH;
+		dst += GBA_SCREEN_WIDTH;
+	}
+}
+
+static inline void gba_mix_frames(bool color_correction)
+{
+	uint16_t *src_curr = GBAScreen;
+	uint16_t *src_prev = GBAScreenPrev;
+	uint16_t *dst      = GBAScreenProcessed;
+	size_t x, y;
+
+	for (y = 0; y < GBA_SCREEN_HEIGHT; y++)
+	{
+		for (x = 0; x < GBA_SCREEN_WIDTH; x++)
+		{
+			/* Get colours from current + previous frames (BGR555) */
+			uint16_t rgb_curr = *(src_curr + x);
+			uint16_t rgb_prev = *(src_prev + x);
+
+			uint16_t r_curr   = rgb_curr       & 0x1F;
+			uint16_t g_curr   = rgb_curr >>  5 & 0x1F;
+			uint16_t b_curr   = rgb_curr >> 10 & 0x1F;
+
+			uint16_t r_prev   = rgb_prev       & 0x1F;
+			uint16_t g_prev   = rgb_prev >>  5 & 0x1F;
+			uint16_t b_prev   = rgb_prev >> 10 & 0x1F;
+
+			/* Store colours for next frame */
+			*(src_prev + x)   = rgb_curr;
+
+			/* Mix colours */
+			uint16_t r_mix    = (r_curr >> 1) + (r_prev >> 1) + (((r_curr & 0x1) + (r_prev & 0x1)) >> 1);
+			uint16_t g_mix    = (g_curr >> 1) + (g_prev >> 1) + (((g_curr & 0x1) + (g_prev & 0x1)) >> 1);
+			uint16_t b_mix    = (b_curr >> 1) + (b_prev >> 1) + (((b_curr & 0x1) + (b_prev & 0x1)) >> 1);
+
+			/* Convert back to BGR555 */
+			uint16_t rgb_mix  = b_mix << 10 | g_mix << 5 | r_mix;
+
+			/* Assign colours for current frame */
+			*(dst + x)        = color_correction ?
+					*(CcLUT + rgb_mix) : rgb_mix;
+		}
+		src_curr += GBA_SCREEN_WIDTH;
+		src_prev += GBA_SCREEN_WIDTH;
+		dst      += GBA_SCREEN_WIDTH;
+	}
 }
 
 /***************************************************************************
@@ -1493,6 +1581,52 @@ static inline void gba_convert(uint16_t* Dest, uint16_t* Src,
 	}
 }
 
+/* Equivalent to gba_convert(), but performs
+ * additional 2x nearest neighbour upscaling
+ * of the source image */
+static inline void gba_convert_2x(uint16_t* out_buf, uint16_t* in_buf,
+	uint32_t in_pitch, uint32_t out_pitch)
+{
+	uint16_t *src      = in_buf;
+	uint16_t *dst      = out_buf;
+	/* Buffers are 16bit -> divide by 2 */
+	uint32_t src_width = in_pitch  >> 1;
+	uint32_t dst_width = out_pitch >> 1;
+	size_t x, y;
+
+	for (y = 0; y < GBA_SCREEN_HEIGHT; y++)
+	{
+		uint16_t *dst_ptr = dst;
+
+		for (x = 0; x < GBA_SCREEN_WIDTH; x++)
+		{
+			/* Get current (converted) pixel colour */
+			uint32_t color = (uint32_t)bgr555_to_native_16(*(src + x));
+
+			/* Double it up to 32bit, so we can set
+			 * two destination pixels at once
+			 * > Note: This is not strictly correct;
+			 *   should use a temporary 2 entry 16bit colour
+			 *   array and memcpy() it to dst_ptr instead.
+			 *   But these kinds of pointer tricks are used
+			 *   everywhere, so might as well do the same
+			 *   here... */
+			color = (color << 16) | color;
+
+			/* Assign colours for current row */
+			*(uint32_t*)dst_ptr = color;
+
+			/* Assign colours for next row */
+			*(uint32_t*)(dst_ptr + dst_width) = color;
+
+			dst_ptr += 2;
+		}
+
+		src += src_width;
+		dst += dst_width << 1;
+	}
+}
+
 /* Downscales an image by half in width and in height; also does color
  * conversion using the function above.
  * Input:
@@ -1581,6 +1715,7 @@ void ApplyScaleMode(video_scale_type NewMode)
 		case fullscreen_subpixel:
 		case fullscreen_bilinear:
 		case hardware:
+		case hardware_2x:
 			break;
 	}
 }
@@ -1594,8 +1729,29 @@ void ReGBA_RenderScreen(void)
 {
 	if (ReGBA_IsRenderingNextFrame())
 	{
+		uint16_t *GBAScreenBuf = GBAScreen;
+
 		Stats.TotalRenderedFrames++;
 		Stats.RenderedFrames++;
+
+		/* Perform colour correction/frame mixing,
+		 * if required */
+		uint32_t ResolvedColorCorrection    = ResolveSetting(
+				ColorCorrection, PerGameColorCorrection);
+		uint32_t ResolvedInterframeBlending = ResolveSetting(
+				InterframeBlending, PerGameInterframeBlending);
+
+		if (ResolvedInterframeBlending)
+		{
+			gba_mix_frames((bool)ResolvedColorCorrection);
+			GBAScreenBuf = GBAScreenProcessed;
+		}
+		else if (ResolvedColorCorrection)
+		{
+			gba_apply_color_correction();
+			GBAScreenBuf = GBAScreenProcessed;
+		}
+
 		video_scale_type ResolvedScaleMode = ResolveSetting(ScaleMode, PerGameScaleMode);
 		if (FramesBordered < 3)
 		{
@@ -1607,51 +1763,58 @@ void ReGBA_RenderScreen(void)
 #ifndef GCW_ZERO
 			case hardware: /* Hardware, when there's no hardware to scale
 			                  images, acts as unscaled */
+			case hardware_2x:
 #endif
 			case unscaled:
-				gba_render_fast(OutputSurface->pixels, GBAScreenSurface->pixels);
+				{
+					uint32_t *GBAScreenBuf32 = (uint32_t *)GBAScreenBuf;
+					gba_render_fast(OutputSurface->pixels, GBAScreenBuf32);
+				}
 				break;
-
 #ifdef NO_SCALING
 			default:
 				break;
 #else /* NO_SCALING */
 			case fullscreen:
-				gba_upscale(OutputSurface->pixels, GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_upscale(OutputSurface->pixels, GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case fullscreen_bilinear:
-				gba_upscale_bilinear(OutputSurface->pixels, GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_upscale_bilinear(OutputSurface->pixels, GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case fullscreen_subpixel:
-				gba_upscale_subpixel(OutputSurface->pixels, GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_upscale_subpixel(OutputSurface->pixels, GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case scaled_aspect:
 				gba_upscale_aspect((uint16_t*) ((uint8_t*)
 					OutputSurface->pixels +
 					(((SCREEN_HEIGHT - (GBA_SCREEN_HEIGHT) * 4 / 3) / 2) * OutputSurface->pitch)) /* center vertically */,
-					GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+					GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case scaled_aspect_bilinear:
 				gba_upscale_aspect_bilinear((uint16_t*) ((uint8_t*)
 					OutputSurface->pixels +
 					(((SCREEN_HEIGHT - (GBA_SCREEN_HEIGHT) * 4 / 3) / 2) * OutputSurface->pitch)) /* center vertically */,
-					GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+					GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 			case scaled_aspect_subpixel:
 				gba_upscale_aspect_subpixel((uint16_t*) ((uint8_t*)
 					OutputSurface->pixels +
 					(((SCREEN_HEIGHT - (GBA_SCREEN_HEIGHT) * 4 / 3) / 2) * OutputSurface->pitch)) /* center vertically */,
-					GBAScreen, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
+					GBAScreenBuf, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 
 #ifdef GCW_ZERO
 			case hardware:
-				gba_convert(OutputSurface->pixels, GBAScreen, GBAScreenSurface->pitch, OutputSurface->pitch);
+				gba_convert(OutputSurface->pixels, GBAScreenBuf, GBAScreenSurface->pitch, OutputSurface->pitch);
+				break;
+
+			case hardware_2x:
+				gba_convert_2x(OutputSurface->pixels, GBAScreenBuf, GBAScreenSurface->pitch, OutputSurface->pitch);
 				break;
 #endif
 #endif /* NO_SCALING */

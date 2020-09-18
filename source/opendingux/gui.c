@@ -406,22 +406,31 @@ static void SavedStateMenuEnd(struct Menu* ActiveMenu)
 // -- Custom display --
 
 static char* OpenDinguxButtonText[OPENDINGUX_BUTTON_COUNT] = {
+	TOP_FACE_BUTTON_NAME,   // (GCW Y, A320 or RG350 X)
+	"A",
+	"B",
+	LEFT_FACE_BUTTON_NAME,  // (GCW X, A320 or RG350 Y)
 	"L",
 	"R",
-	"D-pad Down",
-	"D-pad Up",
-	"D-pad Left",
-	"D-pad Right",
-	"Start",
+	"L2",
+	"R2",
 	"Select",
-	"B",
-	"A",
-	LEFT_FACE_BUTTON_NAME,
-	TOP_FACE_BUTTON_NAME,
-	"Analog Down",
-	"Analog Up",
-	"Analog Left",
-	"Analog Right",
+	"Start",
+	"L3",
+	"R3",
+	"D-pad Up",
+	"D-pad Right",
+	"D-pad Down",
+	"D-pad Left",
+	"POWER",
+	"L-Analog Down",
+	"L-Analog Up",
+	"L-Analog Left",
+	"L-Analog Right",
+	"R-Analog Down",
+	"R-Analog Up",
+	"R-Analog Left",
+	"R-Analog Right",
 };
 
 /*
@@ -573,22 +582,31 @@ static void SavedStateUpdatePreview(struct Menu* ActiveMenu)
 // -- Custom saving --
 
 static char OpenDinguxButtonSave[OPENDINGUX_BUTTON_COUNT] = {
+	'X', // Using the SNES/DS/A320 mapping, this is the upper face button.
+	'A',
+	'B',
+	'Y', // Using the SNES/DS/A320 mapping, this is the left face button.
 	'L',
 	'R',
-	'v', // D-pad directions.
-	'^',
-	'<',
-	'>', // (end)
-	'S',
-	's',
-	'B',
-	'A',
-	'Y', // Using the SNES/DS/A320 mapping, this is the left face button.
-	'X', // Using the SNES/DS/A320 mapping, this is the upper face button.
-	'd', // Analog nub directions (GCW Zero).
-	'u',
-	'l',
-	'r', // (end)
+	'+', // L2
+	'-', // R2
+	's', // Select
+	'S', // Start
+	'1', // L3
+	'2', // R3
+	'^', // D-pad directions.
+	'>',
+	'v',
+	'<', // (end)
+	'M', // Menu/Power
+	'd', // L-analog down
+	'u', // L-analog up
+	'l', // L-analog left
+	'r', // L-analog right
+	'3', // R-analog down
+	'4', // R-analog up
+	'5', // R-analog left
+	'6', // R-analog right
 };
 
 static void LoadMappingFunction(struct MenuEntry* ActiveMenuEntry, char* Value)
@@ -1181,13 +1199,31 @@ static struct MenuEntry DisplayMenu_FPSCounter = {
 #ifndef NO_SCALING
 static struct MenuEntry PerGameDisplayMenu_ScaleMode = {
 	ENTRY_OPTION("image_size", "Image scaling", &PerGameScaleMode),
-	.ChoiceCount = 9, .Choices = { { "No override", "" }, { "Aspect, fast", "aspect" }, { "Full, fast", "fullscreen" }, { "Aspect, bilinear", "aspect_bilinear" }, { "Full, bilinear", "fullscreen_bilinear" }, { "Aspect, sub-pixel", "aspect_subpixel" }, { "Full, sub-pixel", "fullscreen_subpixel" }, { "None", "original" }, { "Hardware", "hardware" } }
+	.ChoiceCount = 10, .Choices = { { "No override", "" }, { "Aspect, fast", "aspect" }, { "Full, fast", "fullscreen" }, { "Aspect, bilinear", "aspect_bilinear" }, { "Full, bilinear", "fullscreen_bilinear" }, { "Aspect, sub-pixel", "aspect_subpixel" }, { "Full, sub-pixel", "fullscreen_subpixel" }, { "None", "original" }, { "Hardware", "hardware" }, { "Hardware (x2)", "hardware_2x" } }
 };
 static struct MenuEntry DisplayMenu_ScaleMode = {
 	ENTRY_OPTION("image_size", "Image scaling", &ScaleMode),
-	.ChoiceCount = 8, .Choices = { { "Aspect, fast", "aspect" }, { "Full, fast", "fullscreen" }, { "Aspect, bilinear", "aspect_bilinear" }, { "Full, bilinear", "fullscreen_bilinear" }, { "Aspect, sub-pixel", "aspect_subpixel" }, { "Full, sub-pixel", "fullscreen_subpixel" }, { "None", "original" }, { "Hardware", "hardware" } }
+	.ChoiceCount = 9, .Choices = { { "Aspect, fast", "aspect" }, { "Full, fast", "fullscreen" }, { "Aspect, bilinear", "aspect_bilinear" }, { "Full, bilinear", "fullscreen_bilinear" }, { "Aspect, sub-pixel", "aspect_subpixel" }, { "Full, sub-pixel", "fullscreen_subpixel" }, { "None", "original" }, { "Hardware", "hardware" }, { "Hardware (x2)", "hardware_2x" } }
 };
 #endif
+
+static struct MenuEntry PerGameDisplayMenu_ColorCorrection = {
+	ENTRY_OPTION("color_correction", "Color Correction", &PerGameColorCorrection),
+	.ChoiceCount = 3, .Choices = { { "No override", "" }, { "Off", "off" }, { "On", "on" } }
+};
+static struct MenuEntry DisplayMenu_ColorCorrection = {
+	ENTRY_OPTION("color_correction", "Color Correction", &ColorCorrection),
+	.ChoiceCount = 2, .Choices = { { "Off", "off" }, { "On", "on" } }
+};
+
+static struct MenuEntry PerGameDisplayMenu_InterframeBlending = {
+	ENTRY_OPTION("interframe_blending", "Interframe Blending", &PerGameInterframeBlending),
+	.ChoiceCount = 3, .Choices = { { "No override", "" }, { "Off", "off" }, { "On", "on" } }
+};
+static struct MenuEntry DisplayMenu_InterframeBlending = {
+	ENTRY_OPTION("interframe_blending", "Interframe Blending", &InterframeBlending),
+	.ChoiceCount = 2, .Choices = { { "Off", "off" }, { "On", "on" } }
+};
 
 static struct MenuEntry PerGameDisplayMenu_Frameskip = {
 	ENTRY_OPTION("frameskip", "Frame skipping", &PerGameUserFrameskip),
@@ -1215,8 +1251,10 @@ static struct Menu PerGameDisplayMenu = {
 #ifndef NO_SCALING
 		&PerGameDisplayMenu_ScaleMode,
 #endif
+		&PerGameDisplayMenu_ColorCorrection, &PerGameDisplayMenu_InterframeBlending,
 		&PerGameDisplayMenu_Frameskip, &PerGameDisplayMenu_FastForwardTarget, NULL }
 };
+
 static struct Menu DisplayMenu = {
 	.Parent = &MainMenu, .Title = "Display settings",
 	.AlternateVersion = &PerGameDisplayMenu,
@@ -1224,6 +1262,7 @@ static struct Menu DisplayMenu = {
 #ifndef NO_SCALING
 		&DisplayMenu_ScaleMode,
 #endif
+		&DisplayMenu_ColorCorrection, &DisplayMenu_InterframeBlending,
 		&DisplayMenu_Frameskip, &DisplayMenu_FastForwardTarget, NULL }
 };
 
@@ -1302,20 +1341,20 @@ static struct MenuEntry InputMenu_RapidB = {
 
 #ifdef GCW_ZERO
 static struct MenuEntry PerGameInputMenu_AnalogSensitivity = {
-	ENTRY_OPTION("analog_sensitivity", "Analog sensitivity", &PerGameAnalogSensitivity),
+	ENTRY_OPTION("analog_sensitivity", "Analogs sensitivity", &PerGameAnalogSensitivity),
 	.ChoiceCount = 6, .Choices = { { "No override", "" }, { "Very low", "lowest" }, { "Low", "low" }, { "Medium", "medium" }, { "High", "high" }, { "Very high", "highest" } }
 };
 static struct MenuEntry InputMenu_AnalogSensitivity = {
-	ENTRY_OPTION("analog_sensitivity", "Analog sensitivity", &AnalogSensitivity),
+	ENTRY_OPTION("analog_sensitivity", "Analogs sensitivity", &AnalogSensitivity),
 	.ChoiceCount = 5, .Choices = { { "Very low", "lowest" }, { "Low", "low" }, { "Medium", "medium" }, { "High", "high" }, { "Very high", "highest" } }
 };
 
 static struct MenuEntry PerGameInputMenu_AnalogAction = {
-	ENTRY_OPTION("analog_action", "Analog in-game binding", &PerGameAnalogAction),
+	ENTRY_OPTION("analog_action", "L-Analog in-game binding", &PerGameAnalogAction),
 	.ChoiceCount = 3, .Choices = { { "No override", "" }, { "None", "none" }, { "GBA D-pad", "dpad" } }
 };
 static struct MenuEntry InputMenu_AnalogAction = {
-	ENTRY_OPTION("analog_action", "Analog in-game binding", &AnalogAction),
+	ENTRY_OPTION("analog_action", "L-Analog in-game binding", &AnalogAction),
 	.ChoiceCount = 2, .Choices = { { "None", "none" }, { "GBA D-pad", "dpad" } }
 };
 #endif

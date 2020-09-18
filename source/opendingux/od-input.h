@@ -20,27 +20,46 @@
 #ifndef __OD_INPUT_H__
 #define __OD_INPUT_H__
 
-#define OPENDINGUX_BUTTON_COUNT 17
+#define OPENDINGUX_BUTTON_COUNT 25
 
 // These must be in the order defined in OpenDinguxKeys in od-input.c.
+// The order of the buttons 0 to 15 must not change because these must also
+// match the codes of the SDL joystick buttons (USB joystick)
 enum OpenDingux_Buttons {
-	OPENDINGUX_BUTTON_L          = 0x00001,
-	OPENDINGUX_BUTTON_R          = 0x00002,
-	OPENDINGUX_BUTTON_DOWN       = 0x00004,
-	OPENDINGUX_BUTTON_UP         = 0x00008,
-	OPENDINGUX_BUTTON_LEFT       = 0x00010,
-	OPENDINGUX_BUTTON_RIGHT      = 0x00020,
-	OPENDINGUX_BUTTON_START      = 0x00040,
-	OPENDINGUX_BUTTON_SELECT     = 0x00080,
-	OPENDINGUX_BUTTON_FACE_DOWN  = 0x00100,
-	OPENDINGUX_BUTTON_FACE_RIGHT = 0x00200,
-	OPENDINGUX_BUTTON_FACE_LEFT  = 0x00400,
-	OPENDINGUX_BUTTON_FACE_UP    = 0x00800,
-	OPENDINGUX_ANALOG_DOWN       = 0x01000,
-	OPENDINGUX_ANALOG_UP         = 0x02000,
-	OPENDINGUX_ANALOG_LEFT       = 0x04000,
-	OPENDINGUX_ANALOG_RIGHT      = 0x08000,
-	OPENDINGUX_BUTTON_MENU       = 0x10000,
+	OPENDINGUX_BUTTON_FACE_UP    = 1 << 0,
+	OPENDINGUX_BUTTON_FACE_RIGHT = 1 << 1,
+	OPENDINGUX_BUTTON_FACE_DOWN  = 1 << 2,
+	OPENDINGUX_BUTTON_FACE_LEFT  = 1 << 3,
+	OPENDINGUX_BUTTON_L          = 1 << 4,
+	OPENDINGUX_BUTTON_R          = 1 << 5,
+	OPENDINGUX_BUTTON_L2         = 1 << 6,
+	OPENDINGUX_BUTTON_R2         = 1 << 7,
+	OPENDINGUX_BUTTON_SELECT     = 1 << 8,
+	OPENDINGUX_BUTTON_START      = 1 << 9,
+	OPENDINGUX_BUTTON_L3         = 1 << 10,
+	OPENDINGUX_BUTTON_R3         = 1 << 11,
+	OPENDINGUX_BUTTON_UP         = 1 << 12,
+	OPENDINGUX_BUTTON_RIGHT      = 1 << 13,
+	OPENDINGUX_BUTTON_DOWN       = 1 << 14,
+	OPENDINGUX_BUTTON_LEFT       = 1 << 15,
+	OPENDINGUX_BUTTON_MENU       = 1 << 16,
+	OPENDINGUX_L_ANALOG_DOWN     = 1 << 17,
+	OPENDINGUX_L_ANALOG_UP       = 1 << 18,
+	OPENDINGUX_L_ANALOG_LEFT     = 1 << 19,
+	OPENDINGUX_L_ANALOG_RIGHT    = 1 << 20,
+	OPENDINGUX_R_ANALOG_DOWN     = 1 << 21,
+	OPENDINGUX_R_ANALOG_UP       = 1 << 22,
+	OPENDINGUX_R_ANALOG_LEFT     = 1 << 23,
+	OPENDINGUX_R_ANALOG_RIGHT    = 1 << 24,
+};
+
+// we need the following indexes to get input from the USB joystick
+// those must match the indexes of the array OpenDinguxKeys
+enum OpenDingux_Buttons_Index {
+	OPENDINGUX_BUTTON_INDEX_UP    = 12,
+	OPENDINGUX_BUTTON_INDEX_RIGHT = 13,
+	OPENDINGUX_BUTTON_INDEX_DOWN  = 14,
+	OPENDINGUX_BUTTON_INDEX_LEFT  = 15,
 };
 
 enum GUI_Action {
@@ -52,6 +71,13 @@ enum GUI_Action {
 	GUI_ACTION_ENTER,
 	GUI_ACTION_LEAVE,
 	GUI_ACTION_ALTERNATE,
+};
+
+enum Joystick_Stick_Axis {
+	JS_AXIS_LEFT_HORIZONTAL  = 0,
+	JS_AXIS_LEFT_VERTICAL    = 1,
+	JS_AXIS_RIGHT_HORIZONTAL = 2,
+	JS_AXIS_RIGHT_VERTICAL   = 3,
 };
 
 // 0 if not fast-forwarding.
@@ -86,18 +112,12 @@ extern uint32_t AnalogAction;
 extern uint_fast8_t FastForwardFrameskipControl;
 
 /*
- * Gets the current value of the analog horizontal axis.
+ * Gets the current value of an analog axis.
+ * Use js = 0 for native joystick or js = 1 for an extra USB joystick.
  * Returns:
- *   A value between -32768 (left) and 32767 (right).
+ *   A value between -32768 (left/up) and 32767 (right/down).
  */
-extern int16_t GetHorizontalAxisValue();
-
-/*
- * Gets the current value of the analog vertical axis.
- * Returns:
- *   A value between -32768 (up) and 32767 (down).
- */
-extern int16_t GetVerticalAxisValue();
+extern int16_t GetAxis(uint_fast8_t js, enum Joystick_Stick_Axis axis);
 
 /*
  * Reads the buttons pressed at the time of the function call on the input
@@ -118,7 +138,8 @@ extern int16_t GetVerticalAxisValue();
  */
 extern enum GUI_Action GetGUIAction();
 
-#if defined GCW_ZERO
+// X and Y labels are inverted in some devices
+#if defined(GCW_ZERO) && !defined(RG350)
 #  define LEFT_FACE_BUTTON_NAME "X"
 #  define TOP_FACE_BUTTON_NAME "Y"
 #else

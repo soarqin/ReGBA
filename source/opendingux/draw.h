@@ -28,7 +28,8 @@ typedef enum
   scaled_aspect_subpixel,
   fullscreen_subpixel,
   unscaled,
-  hardware
+  hardware,
+  hardware_2x
 } video_scale_type;
 
 enum HorizontalAlignment {
@@ -45,6 +46,12 @@ enum VerticalAlignment {
 
 extern video_scale_type PerGameScaleMode;
 extern video_scale_type ScaleMode;
+
+extern uint32_t PerGameColorCorrection;
+extern uint32_t ColorCorrection;
+
+extern uint32_t PerGameInterframeBlending;
+extern uint32_t InterframeBlending;
 
 void init_video();
 extern bool ApplyBorder(const char* Filename);
